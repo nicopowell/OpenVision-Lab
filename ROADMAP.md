@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M0.2 (minimal PySide6 application) is complete. The next milestone is M1:
-loading an image and applying grayscale.
+M1 (loading an image and applying grayscale) is complete. The next milestone
+is M2: executing multiple processors in a fixed sequence.
 
 ## Guiding Principles
 
@@ -108,6 +108,8 @@ and display the processed result.
 - Basic error behavior.
 
 A generic processor abstraction is not needed at this stage.
+
+**Current status:** Complete.
 
 ## M2: Multiple Processors in a Fixed Sequence
 

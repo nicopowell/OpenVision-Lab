@@ -11,6 +11,12 @@ The initial workflow is:
 The initial goal is intentionally small: load one image, convert it to
 grayscale, and display both the original and processed images.
 
+## Usage
+
+1. Start the application.
+2. Open `File > Open Image...` and choose a PNG, JPEG, BMP, or TIFF file.
+3. The original and grayscale images are shown side by side.
+
 ## Requirements
 
 - Python 3.14
