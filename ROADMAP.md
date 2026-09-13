@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-The project is currently at milestone M0.1: preparing the Python development
-environment.
+M0.1 (preparing the Python development environment) is complete. The next
+milestone is M0.2: creating a minimal PySide6 application.
 
 ## Guiding Principles
 
@@ -54,7 +54,7 @@ document the development commands.
 - The selected dependencies are documented.
 - The commands for development tasks are documented.
 
-**Current status:** In progress.
+**Current status:** Complete.
 
 ### M0.2: Minimal PySide6 Application
 

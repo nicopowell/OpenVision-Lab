@@ -1,0 +1,18 @@
+[project]
+name = "openvision-lab"
+version = "0.1.0"
+description = "A desktop playground for learning and experimenting with Computer Vision."
+requires-python = ">=3.14"
+dependencies = [
+    "PySide6==6.11.2",
+    "opencv-python==4.14.0.94",
+    "numpy==2.5.3",
+]
+
+[dependency-groups]
+dev = [
+    "pytest==9.1.1",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
