@@ -42,7 +42,7 @@ class MainWindow(QMainWindow):
         label = QLabel()
         label.setAlignment(Qt.AlignCenter)
         label.setMinimumSize(320, 240)
-        label.setScaledContents(True)
+        label.setScaledContents(False)
         return label
 
     def _create_panel(self, title: str, label: QLabel) -> QGroupBox:
