@@ -49,6 +49,32 @@ desktop platforms when doing so does not add unnecessary complexity.
 - Avoid premature optimization and speculative features.
 - Preserve cross-platform compatibility when it does not complicate the design.
 
+## Documentation and Comments
+
+This project is a learning tool, so documentation should help a student follow,
+understand, and review the code.
+
+- Add brief comments when they clarify non-obvious concepts or important
+  decisions. Explain what a piece of code does and, especially, why it is
+  implemented that way.
+- Avoid comments that merely restate what the code already says.
+- Give functions and methods a short docstring when their purpose, parameters,
+  return value, exceptions, or contract are not obvious from the signature and
+  the code.
+- Do not document functions or methods whose name, parameters, and behavior are
+  already clear on their own. Add documentation only when it provides
+  information that is not evident from the signature and the code.
+- Explain important parameters, especially when they have restrictions, units,
+  formats, ranges, or effects that are not obvious from the name.
+- Document relevant data types and shapes when useful for learning, such as
+  shapes, dtypes, image channels, and conventions like BGR/RGB.
+- Explain non-obvious design decisions close to the code or in the appropriate
+  documentation.
+- When a function can raise exceptions that matter to its callers, briefly
+  document the conditions that trigger them.
+- Keep documentation concise. The goal is to help a student follow and review
+  the code, not to document every line or write excessively long explanations.
+
 ## Language
 
 The project uses English for source code, comments, documentation, user-facing
