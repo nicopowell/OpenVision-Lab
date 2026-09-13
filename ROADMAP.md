@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M0.1 (preparing the Python development environment) is complete. The next
-milestone is M0.2: creating a minimal PySide6 application.
+M0.2 (minimal PySide6 application) is complete. The next milestone is M1:
+loading an image and applying grayscale.
 
 ## Guiding Principles
 
@@ -76,6 +76,8 @@ document the development commands.
 - Minimal application entry point.
 - Basic UI organization.
 - Development command used to launch the application.
+
+**Current status:** Complete.
 
 ## M1: Load Image and Apply Grayscale
 

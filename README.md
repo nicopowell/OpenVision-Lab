@@ -27,6 +27,12 @@ uv sync
 
 ## Development Commands
 
+Run the application:
+
+```bash
+uv run python -m openvision_lab
+```
+
 Run a command inside the project environment:
 
 ```bash
