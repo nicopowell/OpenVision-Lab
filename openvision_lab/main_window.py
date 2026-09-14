@@ -1,6 +1,6 @@
 import numpy as np
 from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction
+from PySide6.QtGui import QAction, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -18,25 +18,66 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from openvision_lab.image_ops import ImageLoadError, load_image
+from openvision_lab.image_ops import (
+    ImageLoadError,
+    ImageSaveError,
+    load_image,
+    save_image,
+)
 from openvision_lab.pipeline import (
     PipelineStep,
     Processor,
     default_pipeline,
-    run_pipeline,
+    run_pipeline_with_intermediates,
 )
 from openvision_lab.qt_image import array_to_qpixmap
 
 # Qt file dialog filter syntax: a description followed by space-separated glob
 # patterns in parentheses.
 IMAGE_FILTER = "Images (*.png *.jpg *.jpeg *.bmp *.tif *.tiff)"
+SAVE_FILTER = (
+    "PNG image (*.png);;"
+    "JPEG image (*.jpg *.jpeg);;"
+    "BMP image (*.bmp);;"
+    "TIFF image (*.tif *.tiff)"
+)
+
+
+class ImageLabel(QLabel):
+    """Label that shows an image scaled to fit without distorting it.
+
+    The image is scaled inside ``paintEvent`` using the current widget size, so
+    storing a new image never changes the label's size hint and cannot feed
+    back into the window layout.
+    """
+
+    def __init__(self) -> None:
+        super().__init__()
+        self._pixmap = QPixmap()
+        self.setAlignment(Qt.AlignCenter)
+        self.setMinimumSize(320, 240)
+
+    def set_array(self, image: np.ndarray) -> None:
+        """Store the image to display and request a repaint."""
+        self._pixmap = array_to_qpixmap(image)
+        self.update()
+
+    def paintEvent(self, _event) -> None:
+        if self._pixmap.isNull():
+            return
+        scaled = self._pixmap.scaled(
+            self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+        )
+        painter = QPainter(self)
+        x = (self.width() - scaled.width()) // 2
+        y = (self.height() - scaled.height()) // 2
+        painter.drawPixmap(x, y, scaled)
 
 
 class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("OpenVision Lab")
-        self.resize(1000, 600)
 
         # The loaded source image is kept so the pipeline can be re-run without
         # reloading the file.
@@ -46,22 +87,42 @@ class MainWindow(QMainWindow):
         # the default steps but is a plain list that can be changed.
         self.steps = default_pipeline()
 
+        # results[0] is the original image and results[k] is the output after
+        # the first k steps, so the last element is the final result.
+        self.intermediates: list[np.ndarray] = []
+
+        # Image currently shown in the preview panel (a selected stage).
+        self._preview_array: np.ndarray | None = None
+
         # Guard set while the parameter widgets are being populated, so loading
         # a step does not write its values back into the step.
         self._loading_step = False
 
-        # Keep the labels as attributes so open_image() and _process() can
-        # replace their pixmaps later.
-        self.original_label = self._create_image_label()
-        self.result_label = self._create_image_label()
+        # Keep the labels as attributes so they can be refreshed later.
+        self.original_label = ImageLabel()
+        self.preview_label = ImageLabel()
+
+        self.view_combo = QComboBox()
+        # Widen the combo to fit the longest stage name instead of truncating.
+        self.view_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.view_combo.currentIndexChanged.connect(self._on_view_changed)
+
+        view_layout = QHBoxLayout()
+        view_layout.addWidget(QLabel("View"))
+        view_layout.addWidget(self.view_combo)
+        view_layout.addStretch(1)
 
         images_layout = QHBoxLayout()
         images_layout.addWidget(self._create_panel("Original", self.original_label))
-        images_layout.addWidget(self._create_panel("Result", self.result_label))
+        images_layout.addWidget(self._create_panel("Preview", self.preview_label))
+
+        images_column = QVBoxLayout()
+        images_column.addLayout(view_layout)
+        images_column.addLayout(images_layout)
 
         central_layout = QHBoxLayout()
         central_layout.addWidget(self._create_pipeline_group())
-        central_layout.addLayout(images_layout, stretch=1)
+        central_layout.addLayout(images_column, stretch=1)
 
         # A QMainWindow shows one central widget, so the layout lives inside a
         # plain QWidget that is set as that central widget.
@@ -69,20 +130,20 @@ class MainWindow(QMainWindow):
         container.setLayout(central_layout)
         self.setCentralWidget(container)
 
-        # The action is parented to the window so Qt keeps it alive as long as
-        # the menu exists.
+        # The actions are parented to the window so Qt keeps them alive as long
+        # as the menu exists.
         open_action = QAction("Open Image...", self)
         open_action.triggered.connect(self.open_image)
-        self.menuBar().addMenu("File").addAction(open_action)
 
-    def _create_image_label(self) -> QLabel:
-        label = QLabel()
-        # Center the pixmap inside the label and keep a minimum panel size.
-        # Contents stay unscaled so the image is not stretched to fit.
-        label.setAlignment(Qt.AlignCenter)
-        label.setMinimumSize(320, 240)
-        label.setScaledContents(False)
-        return label
+        self.save_action = QAction("Save Result As...", self)
+        self.save_action.setEnabled(False)
+        self.save_action.triggered.connect(self.save_result)
+
+        file_menu = self.menuBar().addMenu("File")
+        file_menu.addAction(open_action)
+        file_menu.addAction(self.save_action)
+
+        self.resize(1000, 600)
 
     def _create_panel(self, title: str, label: QLabel) -> QGroupBox:
         panel = QGroupBox(title)
@@ -256,6 +317,42 @@ class MainWindow(QMainWindow):
         # Keep the moved step selected at its new position.
         self._rebuild_step_list(target)
 
+    def _update_view_combo(self) -> None:
+        """Fill the view combo with the available stages.
+
+        Item 0 is the final result. Item ``k`` shows the output after the first
+        ``k`` steps, which is exactly ``self.intermediates[k]``.
+        """
+        previous = self.view_combo.currentIndex()
+        self.view_combo.blockSignals(True)
+        self.view_combo.clear()
+        self.view_combo.addItem("Final result")
+        for step in self.steps:
+            self.view_combo.addItem(f"After {self._describe_step(step)}")
+        if 0 <= previous < self.view_combo.count():
+            self.view_combo.setCurrentIndex(previous)
+        else:
+            self.view_combo.setCurrentIndex(0)
+        self.view_combo.blockSignals(False)
+
+    def _on_view_changed(self, index: int) -> None:
+        if not self.intermediates:
+            self._preview_array = None
+        elif index == 0:
+            self._preview_array = self.intermediates[-1]
+        elif index < len(self.intermediates):
+            self._preview_array = self.intermediates[index]
+        else:
+            self._preview_array = self.intermediates[-1]
+        self._render_images()
+
+    def _render_images(self) -> None:
+        """Refresh the original and preview panels from the stored arrays."""
+        if self.current_image is not None:
+            self.original_label.set_array(self.current_image)
+        if self._preview_array is not None:
+            self.preview_label.set_array(self._preview_array)
+
     def open_image(self) -> None:
         """Ask the user for an image file and update both panels.
 
@@ -274,17 +371,39 @@ class MainWindow(QMainWindow):
             QMessageBox.warning(self, "Open Image", str(error))
             return
         self.current_image = image
-        self.original_label.setPixmap(array_to_qpixmap(image))
         self.apply_button.setEnabled(True)
+        self.save_action.setEnabled(True)
         self._process()
 
     def _process(self) -> None:
-        """Run the pipeline on the loaded image with the current steps."""
+        """Run the pipeline and refresh the preview and the stage selector."""
         if self.current_image is None:
             return
         try:
-            result = run_pipeline(self.current_image, self.steps)
+            self.intermediates = run_pipeline_with_intermediates(
+                self.current_image, self.steps
+            )
         except ValueError as error:
             QMessageBox.warning(self, "Processing", str(error))
             return
-        self.result_label.setPixmap(array_to_qpixmap(result))
+        self._update_view_combo()
+        self._on_view_changed(self.view_combo.currentIndex())
+
+    def save_result(self) -> None:
+        """Save the final processed image to a file chosen by the user.
+
+        The pipeline result is written at full resolution, not the scaled
+        preview. Save errors are shown in a message box instead of being
+        raised.
+        """
+        if not self.intermediates:
+            return
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Result", "result.png", SAVE_FILTER
+        )
+        if not path:
+            return
+        try:
+            save_image(path, self.intermediates[-1])
+        except ImageSaveError as error:
+            QMessageBox.warning(self, "Save Result", str(error))

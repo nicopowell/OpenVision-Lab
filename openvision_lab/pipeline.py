@@ -66,6 +66,31 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
     raise ValueError(f"Unsupported processor: {step.processor!r}")
 
 
+def run_pipeline_with_intermediates(
+    image: np.ndarray, steps: list[PipelineStep]
+) -> list[np.ndarray]:
+    """Apply a list of steps and keep the result after each step.
+
+    Args:
+        image: BGR image of shape ``(height, width, 3)`` and dtype ``uint8``.
+        steps: Ordered steps to apply.
+
+    Returns:
+        A list of ``len(steps) + 1`` arrays. Index 0 is the input image and
+        index ``k`` is the output after the first ``k`` steps. The arrays are
+        kept by reference instead of copied, so the original image is part of
+        the list but is never modified.
+
+    Raises:
+        ValueError: If a step receives an image that does not match its
+            precondition, for example a blur step placed before grayscale.
+    """
+    results = [image]
+    for step in steps:
+        results.append(apply_step(results[-1], step))
+    return results
+
+
 def run_pipeline(image: np.ndarray, steps: list[PipelineStep]) -> np.ndarray:
     """Apply a list of steps to an image, in order.
 
@@ -81,10 +106,7 @@ def run_pipeline(image: np.ndarray, steps: list[PipelineStep]) -> np.ndarray:
         ValueError: If a step receives an image that does not match its
             precondition, for example a blur step placed before grayscale.
     """
-    result = image
-    for step in steps:
-        result = apply_step(result, step)
-    return result
+    return run_pipeline_with_intermediates(image, steps)[-1]
 
 
 def default_pipeline() -> list[PipelineStep]:

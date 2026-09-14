@@ -7,6 +7,7 @@ from openvision_lab.pipeline import (
     Processor,
     default_pipeline,
     run_pipeline,
+    run_pipeline_with_intermediates,
 )
 
 
@@ -104,3 +105,46 @@ def test_default_pipeline_returns_independent_lists():
 
     assert first is not second
     assert second[1].kernel_size == 5
+
+
+def test_intermediates_include_input_and_final_result():
+    image = _sample_image()
+    steps = default_pipeline()
+
+    results = run_pipeline_with_intermediates(image, steps)
+
+    assert len(results) == len(steps) + 1
+    assert results[0] is image
+    assert np.array_equal(results[-1], run_pipeline(image, steps))
+
+
+def test_intermediates_match_prefix_composition():
+    image = _sample_image()
+    steps = default_pipeline()
+
+    results = run_pipeline_with_intermediates(image, steps)
+
+    gray = to_grayscale(image)
+    blurred = gaussian_blur(gray, kernel_size=5, sigma=0.0)
+    expected = binary_threshold(blurred, threshold=127)
+    assert np.array_equal(results[1], gray)
+    assert np.array_equal(results[2], blurred)
+    assert np.array_equal(results[3], expected)
+
+
+def test_intermediates_empty_pipeline_returns_only_input():
+    image = _sample_image()
+
+    results = run_pipeline_with_intermediates(image, [])
+
+    assert len(results) == 1
+    assert results[0] is image
+
+
+def test_intermediates_do_not_modify_original():
+    image = _sample_image()
+    original_copy = image.copy()
+
+    run_pipeline_with_intermediates(image, default_pipeline())
+
+    assert np.array_equal(image, original_copy)

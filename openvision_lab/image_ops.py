@@ -23,6 +23,14 @@ class ImageLoadError(Exception):
     """
 
 
+class ImageSaveError(Exception):
+    """Raised when an image cannot be written to a file.
+
+    ``cv2.imwrite`` returns ``False`` instead of raising on failure, so this
+    exception makes that silent failure explicit for callers.
+    """
+
+
 def load_image(path: str) -> np.ndarray:
     """Load an image file as a BGR color image.
 
@@ -43,6 +51,26 @@ def load_image(path: str) -> np.ndarray:
     if image is None:
         raise ImageLoadError(f"Could not load image: {path}")
     return image
+
+
+def save_image(path: str, image: np.ndarray) -> None:
+    """Save an image array to a file.
+
+    OpenCV chooses the output format from the file extension.
+
+    Args:
+        path: Destination path including the file extension, for example
+            ``result.png`` or ``result.jpg``.
+        image: Image array to write. Grayscale ``(height, width)`` and BGR
+            ``(height, width, 3)`` ``uint8`` images are supported.
+
+    Raises:
+        ImageSaveError: If OpenCV cannot write the file, for example because
+            the extension is unsupported or the parent directory does not
+            exist.
+    """
+    if not cv2.imwrite(path, image):
+        raise ImageSaveError(f"Could not save image: {path}")
 
 
 def to_grayscale(image: np.ndarray) -> np.ndarray:

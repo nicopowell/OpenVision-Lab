@@ -4,9 +4,11 @@ import pytest
 
 from openvision_lab.image_ops import (
     ImageLoadError,
+    ImageSaveError,
     binary_threshold,
     gaussian_blur,
     load_image,
+    save_image,
     to_grayscale,
 )
 
@@ -155,5 +157,37 @@ def test_binary_threshold_rejects_out_of_range_threshold(threshold):
 
     with pytest.raises(ValueError):
         binary_threshold(image, threshold=threshold)
+
+
+def test_save_image_round_trip_color(tmp_path):
+    image = np.zeros((4, 5, 3), dtype=np.uint8)
+    image[:, :, 0] = 10
+    image[:, :, 1] = 20
+    image[:, :, 2] = 30
+    path = tmp_path / "out.png"
+
+    save_image(str(path), image)
+
+    assert np.array_equal(load_image(str(path)), image)
+
+
+def test_save_image_round_trip_grayscale(tmp_path):
+    image = np.array([[0, 255], [128, 64]], dtype=np.uint8)
+    path = tmp_path / "out.bmp"
+
+    save_image(str(path), image)
+
+    loaded = load_image(str(path))
+    assert loaded.shape == (2, 2, 3)
+    assert np.array_equal(loaded[:, :, 0], image)
+    assert np.array_equal(loaded[:, :, 1], image)
+    assert np.array_equal(loaded[:, :, 2], image)
+
+
+def test_save_image_invalid_path_raises(tmp_path):
+    image = np.zeros((2, 2, 3), dtype=np.uint8)
+
+    with pytest.raises(ImageSaveError):
+        save_image(str(tmp_path / "missing_dir" / "out.png"), image)
 
 

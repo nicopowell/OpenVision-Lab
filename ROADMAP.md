@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M4 (editable pipeline) is complete. The next milestone is M5: intermediate
-results and export.
+M5 (intermediate results and export) is complete. The next milestone is M6:
+testing, quality, and refactoring.
 
 ## Guiding Principles
 
@@ -260,6 +260,22 @@ final processed image.
 - How intermediate results are selected or displayed.
 - Which output formats are supported.
 - How large images are handled.
+
+**Implemented:**
+
+- `run_pipeline_with_intermediates()` returns the result of every stage:
+  index 0 is the original image and index `k` is the output after the first `k`
+  steps. Arrays are kept by reference, not copied, and the original is never
+  modified. `run_pipeline()` delegates to it.
+- A `View` selector above the preview panel shows the final result or the
+  output after any step.
+- The preview is scaled to fit its panel while preserving the aspect ratio;
+  exporting always writes the full-resolution result.
+- `File > Save Result As...` exports the final processed image as PNG, JPEG,
+  BMP, or TIFF through `save_image()`, which raises `ImageSaveError` on failure.
+- Focused tests cover the intermediate list and image saving.
+
+**Current status:** Complete.
 
 ## M6: Testing, Quality, and Refactoring
 
