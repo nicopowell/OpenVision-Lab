@@ -6,6 +6,7 @@ from openvision_lab.image_ops import (
     binary_threshold,
     canny,
     gaussian_blur,
+    morphology,
     to_grayscale,
 )
 from openvision_lab.pipeline import (
@@ -179,6 +180,40 @@ def test_error_message_names_the_failing_processor(bgr_image):
     message = str(excinfo.value)
     assert "Processor 'Adaptive threshold' failed:" in message
     assert "grayscale image with shape" in message
+
+
+def test_morphology_step_runs_after_grayscale(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.MORPHOLOGY),
+    ]
+
+    expected = morphology(to_grayscale(bgr_image), kernel_size=5)
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_morphology_step_uses_its_own_parameters(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.MORPHOLOGY, kernel_size=7, use_closing=True),
+    ]
+
+    expected = morphology(to_grayscale(bgr_image), kernel_size=7, use_closing=True)
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_morphology_before_grayscale_raises_value_error(bgr_image):
+    steps = [
+        PipelineStep(Processor.MORPHOLOGY),
+        PipelineStep(Processor.GRAYSCALE),
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        run_pipeline(bgr_image, steps)
+
+    assert "Processor 'Morphology' failed:" in str(excinfo.value)
 
 
 def test_default_pipeline_returns_independent_lists():

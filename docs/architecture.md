@@ -9,7 +9,7 @@ from the Qt interface so it can be understood and tested on its own.
 
 | Module | Responsibility |
 | --- | --- |
-| `image_ops.py` | OpenCV primitives: load, save, grayscale, Gaussian blur, binary threshold, adaptive threshold, Canny. No Qt. |
+| `image_ops.py` | OpenCV primitives: load, save, grayscale, Gaussian blur, binary threshold, adaptive threshold, morphology, Canny. No Qt. |
 | `pipeline.py` | Pipeline model: `Processor`, `PipelineStep`, `apply_step`, `run_pipeline`, `run_pipeline_with_intermediates`, `default_pipeline`. |
 | `pipeline_io.py` | Save and load pipelines as JSON, with validation. |
 | `history.py` | Snapshot-based undo and redo of the pipeline. |
@@ -20,10 +20,10 @@ from the Qt interface so it can be understood and tested on its own.
 ## Data flow
 
 `load_image` returns a BGR `uint8` array of shape `(H, W, 3)`. Each step takes
-an image and returns one; grayscale, binary threshold, adaptive threshold, and
-Canny output `(H, W)`. `run_pipeline_with_intermediates` keeps the input plus
-the output of every step, so index 0 is the original and index `k` is the result
-after `k` steps.
+an image and returns one; grayscale, binary threshold, adaptive threshold,
+morphology, and Canny output `(H, W)`. `run_pipeline_with_intermediates` keeps
+the input plus the output of every step, so index 0 is the original and index
+`k` is the result after `k` steps.
 
 ## Key decisions
 
@@ -60,6 +60,7 @@ the parameters that apply to it:
       "constant": 2.0,
       "use_gaussian": false
     },
+    {"processor": "MORPHOLOGY", "kernel_size": 5, "use_closing": false},
     {
       "processor": "CANNY",
       "low_threshold": 100,

@@ -14,6 +14,7 @@ from openvision_lab.image_ops import (
     binary_threshold,
     canny,
     gaussian_blur,
+    morphology,
     to_grayscale,
 )
 
@@ -28,6 +29,7 @@ class Processor(Enum):
     GAUSSIAN_BLUR = "Gaussian blur"
     BINARY_THRESHOLD = "Binary threshold"
     ADAPTIVE_THRESHOLD = "Adaptive threshold"
+    MORPHOLOGY = "Morphology"
     CANNY = "Canny edges"
 
 
@@ -37,7 +39,8 @@ class PipelineStep:
 
     Attributes:
         processor: Which operation to apply.
-        kernel_size: Gaussian blur kernel size. Ignored by other processors.
+        kernel_size: Gaussian blur and morphology kernel size. Ignored by other
+            processors.
         sigma: Gaussian blur sigma. Ignored by other processors.
         threshold: Binary threshold value. Ignored by other processors.
         block_size: Adaptive threshold neighborhood size. Ignored by other
@@ -46,6 +49,8 @@ class PipelineStep:
             Ignored by other processors.
         use_gaussian: Whether adaptive threshold uses a Gaussian window instead
             of a flat mean. Ignored by other processors.
+        use_closing: Whether morphology applies a closing instead of an opening.
+            Ignored by other processors.
         low_threshold: Canny lower hysteresis threshold. Ignored by other
             processors.
         high_threshold: Canny upper hysteresis threshold. Ignored by other
@@ -60,6 +65,7 @@ class PipelineStep:
     block_size: int = 11
     constant: float = 2.0
     use_gaussian: bool = False
+    use_closing: bool = False
     low_threshold: int = 100
     high_threshold: int = 200
     aperture_size: int = 3
@@ -72,8 +78,8 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
         image: Input array. Each processor validates its own expected shape:
             grayscale expects a BGR ``(height, width, 3)`` image and produces a
             grayscale ``(height, width)`` one, while Gaussian blur, binary
-            threshold, adaptive threshold, and Canny expect a grayscale
-            ``(height, width)`` image.
+            threshold, adaptive threshold, morphology, and Canny expect a
+            grayscale ``(height, width)`` image.
         step: The configured step to apply.
 
     Returns:
@@ -97,6 +103,12 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
                 block_size=step.block_size,
                 constant=step.constant,
                 use_gaussian=step.use_gaussian,
+            )
+        if step.processor is Processor.MORPHOLOGY:
+            return morphology(
+                image,
+                kernel_size=step.kernel_size,
+                use_closing=step.use_closing,
             )
         if step.processor is Processor.CANNY:
             return canny(

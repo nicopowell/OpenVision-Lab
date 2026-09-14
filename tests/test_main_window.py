@@ -172,6 +172,56 @@ def test_invalid_adaptive_block_size_is_not_silently_corrected(
     assert warnings
 
 
+def test_morphology_parameters_write_back_to_the_step(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.MORPHOLOGY),
+    ]
+    window._rebuild_step_list(1)
+
+    window.kernel_spin.setValue(7)
+    window.morph_combo.setCurrentIndex(1)
+
+    step = window.steps[1]
+    assert step.kernel_size == 7
+    assert step.use_closing is True
+    assert "closing" in window.step_list.item(1).text()
+    assert "k=7" in window.step_list.item(1).text()
+
+
+def test_invalid_morphology_kernel_size_is_not_silently_corrected(
+    qtbot, tmp_path, monkeypatch
+):
+    image_path = tmp_path / "sample.png"
+    _write_sample_image(image_path)
+    window = MainWindow()
+    qtbot.addWidget(window)
+    _patch_open_image(monkeypatch, image_path)
+    window.open_image()
+
+    window.steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.MORPHOLOGY),
+    ]
+    window._rebuild_step_list(1)
+
+    # An invalid kernel size typed by the user must survive the widget instead
+    # of being clamped, so the pipeline validation can explain the problem.
+    window.kernel_spin.setValue(2)
+    assert window.kernel_spin.value() == 2
+    assert window.steps[1].kernel_size == 2
+
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args, **kwargs: warnings.append(args)
+    )
+    window._process()
+
+    assert warnings
+
+
 def test_processor_combo_lists_every_processor(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
@@ -182,6 +232,7 @@ def test_processor_combo_lists_every_processor(qtbot):
     ]
 
     assert Processor.ADAPTIVE_THRESHOLD in listed
+    assert Processor.MORPHOLOGY in listed
     assert Processor.CANNY in listed
 
 
