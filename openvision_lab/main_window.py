@@ -1,12 +1,16 @@
+import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
     QFileDialog,
+    QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
     QMainWindow,
     QMessageBox,
+    QPushButton,
+    QSpinBox,
     QVBoxLayout,
     QWidget,
 )
@@ -25,19 +29,27 @@ class MainWindow(QMainWindow):
         self.setWindowTitle("OpenVision Lab")
         self.resize(900, 600)
 
-        # Keep the labels as attributes so open_image() can replace their
-        # pixmaps later, when the user picks a file.
+        # The loaded source image is kept so the pipeline can be re-run with
+        # new parameters without reloading the file.
+        self.current_image: np.ndarray | None = None
+
+        # Keep the labels as attributes so open_image() and _process() can
+        # replace their pixmaps later.
         self.original_label = self._create_image_label()
         self.result_label = self._create_image_label()
 
-        layout = QHBoxLayout()
-        layout.addWidget(self._create_panel("Original", self.original_label))
-        layout.addWidget(self._create_panel("Result", self.result_label))
+        images_layout = QHBoxLayout()
+        images_layout.addWidget(self._create_panel("Original", self.original_label))
+        images_layout.addWidget(self._create_panel("Result", self.result_label))
+
+        central_layout = QVBoxLayout()
+        central_layout.addWidget(self._create_parameters_group())
+        central_layout.addLayout(images_layout)
 
         # A QMainWindow shows one central widget, so the layout lives inside a
         # plain QWidget that is set as that central widget.
         container = QWidget()
-        container.setLayout(layout)
+        container.setLayout(central_layout)
         self.setCentralWidget(container)
 
         # The action is parented to the window so Qt keeps it alive as long as
@@ -61,11 +73,38 @@ class MainWindow(QMainWindow):
         panel_layout.addWidget(label)
         return panel
 
+    def _create_parameters_group(self) -> QGroupBox:
+        # Only odd kernel sizes are valid for Gaussian blur, so the spin box
+        # steps by 2. gaussian_blur() still validates the value defensively.
+        self.kernel_spin = QSpinBox()
+        self.kernel_spin.setRange(1, 31)
+        self.kernel_spin.setSingleStep(2)
+        self.kernel_spin.setValue(5)
+
+        self.threshold_spin = QSpinBox()
+        self.threshold_spin.setRange(0, 255)
+        self.threshold_spin.setValue(127)
+
+        self.apply_button = QPushButton("Apply")
+        self.apply_button.setEnabled(False)
+        self.apply_button.clicked.connect(self._process)
+
+        form_layout = QFormLayout()
+        form_layout.addRow("Blur kernel size", self.kernel_spin)
+        form_layout.addRow("Threshold", self.threshold_spin)
+
+        group = QGroupBox("Parameters")
+        group_layout = QVBoxLayout(group)
+        group_layout.addLayout(form_layout)
+        group_layout.addWidget(self.apply_button)
+        return group
+
     def open_image(self) -> None:
         """Ask the user for an image file and update both panels.
 
-        Does nothing when the dialog is cancelled. Load and processing errors
-        are shown in a message box instead of being raised.
+        Does nothing when the dialog is cancelled. Load errors are shown in a
+        message box instead of being raised. The parameters are applied with
+        their current values.
         """
         # getOpenFileName returns (path, selected_filter); the path is empty
         # when the user cancels.
@@ -74,9 +113,25 @@ class MainWindow(QMainWindow):
             return
         try:
             image = load_image(path)
-            result = run_pipeline(image)
-        except (ImageLoadError, ValueError) as error:
+        except ImageLoadError as error:
             QMessageBox.warning(self, "Open Image", str(error))
             return
+        self.current_image = image
         self.original_label.setPixmap(array_to_qpixmap(image))
+        self.apply_button.setEnabled(True)
+        self._process()
+
+    def _process(self) -> None:
+        """Re-run the pipeline on the loaded image with the current parameters."""
+        if self.current_image is None:
+            return
+        try:
+            result = run_pipeline(
+                self.current_image,
+                kernel_size=self.kernel_spin.value(),
+                threshold=self.threshold_spin.value(),
+            )
+        except ValueError as error:
+            QMessageBox.warning(self, "Processing", str(error))
+            return
         self.result_label.setPixmap(array_to_qpixmap(result))

@@ -8,14 +8,16 @@ The initial workflow is:
 2. Apply image-processing operations.
 3. Display the result.
 
-The initial goal is intentionally small: load one image, convert it to
-grayscale, and display both the original and processed images.
+The application loads an image, runs a fixed pipeline (grayscale, Gaussian
+blur, binary threshold), and shows the original and processed images. The blur
+kernel size and threshold value can be adjusted.
 
 ## Usage
 
 1. Start the application.
 2. Open `File > Open Image...` and choose a PNG, JPEG, BMP, or TIFF file.
 3. The original and processed images are shown side by side.
+4. Adjust `Blur kernel size` or `Threshold` and click `Apply` to reprocess.
 
 ## Requirements
 

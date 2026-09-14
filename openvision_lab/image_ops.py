@@ -75,55 +75,71 @@ def _require_grayscale(image: np.ndarray) -> None:
         )
 
 
-def gaussian_blur(image: np.ndarray) -> np.ndarray:
+def gaussian_blur(
+    image: np.ndarray, *, kernel_size: int = 5, sigma: float = 0.0
+) -> np.ndarray:
     """Smooth a grayscale image with a Gaussian blur.
 
     Args:
         image: Grayscale image of shape ``(height, width)`` and dtype ``uint8``.
+        kernel_size: Size of the square Gaussian kernel. It must be a positive
+            odd integer. Larger values blur more.
+        sigma: Standard deviation of the Gaussian kernel. It must be
+            non-negative. A value of 0 lets OpenCV derive it from
+            ``kernel_size``.
 
     Returns:
         A blurred ``uint8`` array with the same shape as the input.
 
     Raises:
-        ValueError: If ``image`` is not a single-channel grayscale image.
+        ValueError: If ``image`` is not a single-channel grayscale image, if
+            ``kernel_size`` is not a positive odd integer, or if ``sigma`` is
+            negative.
     """
     _require_grayscale(image)
-    # The kernel size must be positive and odd. A sigma of 0 lets OpenCV
-    # derive the standard deviation from the kernel size.
-    return cv2.GaussianBlur(image, (5, 5), 0.0)
+    if not isinstance(kernel_size, int) or isinstance(kernel_size, bool):
+        raise ValueError(f"kernel_size must be an integer; got {kernel_size!r}.")
+    if kernel_size < 1 or kernel_size % 2 == 0:
+        raise ValueError(f"kernel_size must be positive and odd; got {kernel_size}.")
+    if sigma < 0:
+        raise ValueError(f"sigma must be non-negative; got {sigma}.")
+
+    return cv2.GaussianBlur(image, (kernel_size, kernel_size), sigma)
 
 
-def binary_threshold(image: np.ndarray) -> np.ndarray:
+def binary_threshold(image: np.ndarray, *, threshold: int = 127) -> np.ndarray:
     """Convert a grayscale image into a binary black-and-white image.
 
-    Pixels greater than the threshold become ``maxval`` (255) and the rest
-    become 0, following OpenCV's ``THRESH_BINARY`` rule.
-
-    The threshold value (127) and maximum value (255) are fixed for M2; they
-    are expected to become configurable in a later milestone.
+    Pixels greater than the threshold become 255 and the rest become 0,
+    following OpenCV's ``THRESH_BINARY`` rule. The maximum value is fixed at
+    255 for now.
 
     Args:
         image: Grayscale image of shape ``(height, width)`` and dtype ``uint8``.
+        threshold: Pixel value that separates black from white. It must be an
+            integer between 0 and 255.
 
     Returns:
         A ``uint8`` array with the same shape, containing only 0 or 255.
 
     Raises:
-        ValueError: If ``image`` is not a single-channel grayscale image.
+        ValueError: If ``image`` is not a single-channel grayscale image, or if
+            ``threshold`` is not an integer between 0 and 255.
     """
     _require_grayscale(image)
+    if not isinstance(threshold, int) or isinstance(threshold, bool):
+        raise ValueError(f"threshold must be an integer; got {threshold!r}.")
+    if not 0 <= threshold <= 255:
+        raise ValueError(f"threshold must be between 0 and 255; got {threshold}.")
+
     # cv2.threshold returns (retval, dst); only the thresholded image matters.
-    _, result = cv2.threshold(image, 127, 255, cv2.THRESH_BINARY)
+    _, result = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
     return result
 
 
-# Fixed, ordered sequence of image operations. Each step is a plain function
-# with the signature ``ndarray -> ndarray``, so the steps compose directly.
-
-PIPELINE = (to_grayscale, gaussian_blur, binary_threshold)
-
-
-def run_pipeline(image: np.ndarray) -> np.ndarray:
+def run_pipeline(
+    image: np.ndarray, *, kernel_size: int = 5, sigma: float = 0.0, threshold: int = 127
+) -> np.ndarray:
     """Run the fixed processing sequence on a color image.
 
     The steps are applied in order: grayscale, Gaussian blur, and binary
@@ -131,16 +147,18 @@ def run_pipeline(image: np.ndarray) -> np.ndarray:
 
     Args:
         image: BGR image of shape ``(height, width, 3)`` and dtype ``uint8``.
+        kernel_size: Gaussian blur kernel size, passed to :func:`gaussian_blur`.
+        sigma: Gaussian blur sigma, passed to :func:`gaussian_blur`.
+        threshold: Binary threshold value, passed to :func:`binary_threshold`.
 
     Returns:
         A binary ``uint8`` array of shape ``(height, width)``.
 
     Raises:
         ValueError: If a step receives an image that does not match its
-            precondition, for example a color image where grayscale is
-            expected.
+            precondition, or if a parameter is outside its valid range.
     """
-    result = image
-    for step in PIPELINE:
-        result = step(result)
+    result = to_grayscale(image)
+    result = gaussian_blur(result, kernel_size=kernel_size, sigma=sigma)
+    result = binary_threshold(result, threshold=threshold)
     return result

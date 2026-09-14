@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M2 (multiple processors in a fixed sequence) is complete. The next milestone
-is M3: configurable processor parameters.
+M3 (configurable processor parameters) is complete. The next milestone is M4:
+editable pipeline.
 
 ## Guiding Principles
 
@@ -183,6 +183,19 @@ Possible parameters include:
 - Parameter representation.
 - Valid ranges and defaults.
 - Explicit processing versus automatic previews.
+
+**Implemented:**
+
+- `gaussian_blur()` accepts a configurable `kernel_size` and `sigma`.
+- `binary_threshold()` accepts a configurable `threshold` (maximum value fixed
+  at 255).
+- `run_pipeline()` receives those parameters and applies the fixed steps in
+  explicit order. The M2 `PIPELINE` tuple was replaced by these calls.
+- Parameters are validated: `ValueError` on even or non-positive kernel sizes,
+  negative sigma, or thresholds outside 0-255.
+- The UI has a "Parameters" group with a kernel-size spin box, a threshold spin
+  box, and an Apply button that reprocesses the loaded image.
+- Focused tests cover custom parameters and their valid ranges.
 
 ## M4: Editable Pipeline
 

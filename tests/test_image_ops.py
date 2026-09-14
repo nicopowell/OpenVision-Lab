@@ -136,3 +136,58 @@ def test_run_pipeline_matches_manual_composition():
 
     assert np.array_equal(run_pipeline(image), expected)
 
+
+def test_gaussian_blur_accepts_custom_kernel_size():
+    image = np.zeros((7, 7), dtype=np.uint8)
+    image[3, 3] = 255
+
+    blurred = gaussian_blur(image, kernel_size=3)
+
+    assert blurred.shape == (7, 7)
+    assert blurred.dtype == np.uint8
+
+
+@pytest.mark.parametrize("kernel_size", [0, 2, 4, -1])
+def test_gaussian_blur_rejects_invalid_kernel_size(kernel_size):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        gaussian_blur(image, kernel_size=kernel_size)
+
+
+def test_gaussian_blur_rejects_negative_sigma():
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        gaussian_blur(image, sigma=-1.0)
+
+
+def test_binary_threshold_accepts_custom_threshold():
+    image = np.array([[100, 130]], dtype=np.uint8)
+
+    result = binary_threshold(image, threshold=120)
+
+    assert result.tolist() == [[0, 255]]
+
+
+@pytest.mark.parametrize("threshold", [-1, 256])
+def test_binary_threshold_rejects_out_of_range_threshold(threshold):
+    image = np.zeros((2, 2), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        binary_threshold(image, threshold=threshold)
+
+
+def test_run_pipeline_uses_custom_parameters():
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    image[3, 3] = 255
+
+    expected = binary_threshold(
+        gaussian_blur(to_grayscale(image), kernel_size=3), threshold=100
+    )
+
+    result = run_pipeline(image, kernel_size=3, threshold=100)
+
+    assert np.array_equal(result, expected)
+
+
