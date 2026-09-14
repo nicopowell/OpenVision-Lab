@@ -227,3 +227,64 @@ def canny(
         threshold2=high_threshold,
         apertureSize=aperture_size,
     )
+
+
+def adaptive_threshold(
+    image: np.ndarray,
+    *,
+    block_size: int = 11,
+    constant: float = 2.0,
+    use_gaussian: bool = False,
+) -> np.ndarray:
+    """Threshold a grayscale image using a threshold computed per pixel.
+
+    Unlike :func:`binary_threshold`, which uses one global threshold for the
+    whole image, this processor compares each pixel with the mean of its local
+    neighborhood minus ``constant``. That makes it robust to uneven
+    illumination, where a single global threshold fails.
+
+    Args:
+        image: Grayscale image of shape ``(height, width)`` and dtype ``uint8``.
+        block_size: Side length of the square neighborhood used to compute the
+            local threshold. It must be an odd integer greater than or equal to
+            3. Larger values consider a wider area around each pixel.
+        constant: Value subtracted from the local mean before comparing. It can
+            be any real number, including 0 and negative values. Larger positive
+            values lower the local threshold and therefore tend to classify more
+            pixels as foreground.
+        use_gaussian: When ``True``, the local mean is weighted by a Gaussian
+            window instead of a flat average.
+
+    Returns:
+        A ``uint8`` array with the same shape, containing only 0 or 255, where
+        255 marks pixels above their local threshold.
+
+    Raises:
+        ValueError: If ``image`` is not a single-channel grayscale image, if
+            ``block_size`` is not an odd integer of at least 3, if ``constant``
+            is not a number, or if ``use_gaussian`` is not a boolean.
+    """
+    _require_grayscale(image)
+    if not isinstance(block_size, int) or isinstance(block_size, bool):
+        raise ValueError(f"block_size must be an integer; got {block_size!r}.")
+    if block_size < 3 or block_size % 2 == 0:
+        raise ValueError(f"block_size must be odd and at least 3; got {block_size}.")
+    if not isinstance(constant, (int, float)) or isinstance(constant, bool):
+        raise ValueError(f"constant must be a number; got {constant!r}.")
+    if not isinstance(use_gaussian, bool):
+        raise ValueError(f"use_gaussian must be a boolean; got {use_gaussian!r}.")
+
+    method = (
+        cv2.ADAPTIVE_THRESH_GAUSSIAN_C if use_gaussian else cv2.ADAPTIVE_THRESH_MEAN_C
+    )
+    # The maximum value is fixed at 255 and the type at THRESH_BINARY, matching
+    # binary_threshold. OpenCV calls the subtracted constant C, so the clearer
+    # public name is mapped to that positional argument here.
+    return cv2.adaptiveThreshold(
+        image,
+        255,
+        method,
+        cv2.THRESH_BINARY,
+        block_size,
+        constant,
+    )

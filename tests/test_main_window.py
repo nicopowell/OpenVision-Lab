@@ -120,6 +120,58 @@ def test_invalid_canny_aperture_is_not_silently_corrected(qtbot, tmp_path, monke
     assert warnings
 
 
+def test_adaptive_threshold_parameters_write_back_to_the_step(qtbot):
+    window = MainWindow()
+    qtbot.addWidget(window)
+    window.steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.ADAPTIVE_THRESHOLD),
+    ]
+    window._rebuild_step_list(1)
+
+    window.block_size_spin.setValue(3)
+    window.constant_spin.setValue(-5.0)
+    window.method_combo.setCurrentIndex(1)
+
+    step = window.steps[1]
+    assert step.block_size == 3
+    assert step.constant == -5.0
+    assert step.use_gaussian is True
+    assert "block=3" in window.step_list.item(1).text()
+    assert "gaussian" in window.step_list.item(1).text()
+
+
+def test_invalid_adaptive_block_size_is_not_silently_corrected(
+    qtbot, tmp_path, monkeypatch
+):
+    image_path = tmp_path / "sample.png"
+    _write_sample_image(image_path)
+    window = MainWindow()
+    qtbot.addWidget(window)
+    _patch_open_image(monkeypatch, image_path)
+    window.open_image()
+
+    window.steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.ADAPTIVE_THRESHOLD),
+    ]
+    window._rebuild_step_list(1)
+
+    # An invalid block size typed by the user must survive the widget instead
+    # of being clamped, so the pipeline validation can explain the problem.
+    window.block_size_spin.setValue(2)
+    assert window.block_size_spin.value() == 2
+    assert window.steps[1].block_size == 2
+
+    warnings = []
+    monkeypatch.setattr(
+        QMessageBox, "warning", lambda *args, **kwargs: warnings.append(args)
+    )
+    window._process()
+
+    assert warnings
+
+
 def test_processor_combo_lists_every_processor(qtbot):
     window = MainWindow()
     qtbot.addWidget(window)
@@ -129,6 +181,7 @@ def test_processor_combo_lists_every_processor(qtbot):
         for row in range(window.processor_combo.count())
     ]
 
+    assert Processor.ADAPTIVE_THRESHOLD in listed
     assert Processor.CANNY in listed
 
 

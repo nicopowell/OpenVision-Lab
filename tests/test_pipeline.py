@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from openvision_lab.image_ops import (
+    adaptive_threshold,
     binary_threshold,
     canny,
     gaussian_blur,
@@ -125,6 +126,59 @@ def test_canny_before_grayscale_raises_value_error(bgr_image):
 
     with pytest.raises(ValueError):
         run_pipeline(bgr_image, steps)
+
+
+def test_adaptive_threshold_step_runs_after_grayscale(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.ADAPTIVE_THRESHOLD),
+    ]
+
+    expected = adaptive_threshold(to_grayscale(bgr_image))
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_adaptive_threshold_step_uses_its_own_parameters(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(
+            Processor.ADAPTIVE_THRESHOLD,
+            block_size=3,
+            constant=1.0,
+            use_gaussian=True,
+        ),
+    ]
+
+    expected = adaptive_threshold(
+        to_grayscale(bgr_image), block_size=3, constant=1.0, use_gaussian=True
+    )
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_adaptive_threshold_before_grayscale_raises_value_error(bgr_image):
+    steps = [
+        PipelineStep(Processor.ADAPTIVE_THRESHOLD),
+        PipelineStep(Processor.GRAYSCALE),
+    ]
+
+    with pytest.raises(ValueError):
+        run_pipeline(bgr_image, steps)
+
+
+def test_error_message_names_the_failing_processor(bgr_image):
+    steps = [
+        PipelineStep(Processor.ADAPTIVE_THRESHOLD),
+        PipelineStep(Processor.GRAYSCALE),
+    ]
+
+    with pytest.raises(ValueError) as excinfo:
+        run_pipeline(bgr_image, steps)
+
+    message = str(excinfo.value)
+    assert "Processor 'Adaptive threshold' failed:" in message
+    assert "grayscale image with shape" in message
 
 
 def test_default_pipeline_returns_independent_lists():

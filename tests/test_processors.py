@@ -2,6 +2,7 @@ import numpy as np
 import pytest
 
 from openvision_lab.image_ops import (
+    adaptive_threshold,
     binary_threshold,
     canny,
     gaussian_blur,
@@ -180,3 +181,81 @@ def test_canny_rejects_low_threshold_above_high():
 
     with pytest.raises(ValueError):
         canny(image, low_threshold=200, high_threshold=100)
+
+
+def test_adaptive_threshold_preserves_shape_and_dtype(gray_image):
+    result = adaptive_threshold(gray_image)
+
+    assert result.shape == gray_image.shape
+    assert result.dtype == np.uint8
+
+
+def test_adaptive_threshold_outputs_only_black_and_white(gray_image):
+    result = adaptive_threshold(gray_image)
+
+    assert set(np.unique(result)).issubset({0, 255})
+
+
+def test_adaptive_threshold_rejects_color_input(bgr_image):
+    with pytest.raises(ValueError):
+        adaptive_threshold(bgr_image)
+
+
+def test_adaptive_threshold_constant_image_with_positive_constant():
+    image = np.full((8, 8), 100, dtype=np.uint8)
+
+    result = adaptive_threshold(image, constant=2.0)
+
+    np.testing.assert_array_equal(result, np.full((8, 8), 255, dtype=np.uint8))
+
+
+def test_adaptive_threshold_constant_image_with_zero_constant():
+    image = np.full((8, 8), 100, dtype=np.uint8)
+
+    result = adaptive_threshold(image, constant=0.0)
+
+    np.testing.assert_array_equal(result, np.zeros((8, 8), dtype=np.uint8))
+
+
+def test_adaptive_threshold_accepts_gaussian_method():
+    image = np.zeros((8, 8), dtype=np.uint8)
+    image[:, 4:] = 255
+
+    result = adaptive_threshold(image, use_gaussian=True)
+
+    assert result.shape == (8, 8)
+    assert result.dtype == np.uint8
+
+
+def test_adaptive_threshold_accepts_negative_constant():
+    image = np.zeros((8, 8), dtype=np.uint8)
+    image[:, 4:] = 255
+
+    result = adaptive_threshold(image, constant=-5.0)
+
+    assert result.shape == (8, 8)
+    assert result.dtype == np.uint8
+
+
+@pytest.mark.parametrize("block_size", [1, 2, 4, 0, -3, True, 5.5, "7"])
+def test_adaptive_threshold_rejects_invalid_block_size(block_size):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        adaptive_threshold(image, block_size=block_size)
+
+
+@pytest.mark.parametrize("constant", ["2", True, None])
+def test_adaptive_threshold_rejects_non_numeric_constant(constant):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        adaptive_threshold(image, constant=constant)
+
+
+@pytest.mark.parametrize("use_gaussian", [0, 1, "mean", None])
+def test_adaptive_threshold_rejects_non_boolean_method(use_gaussian):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        adaptive_threshold(image, use_gaussian=use_gaussian)

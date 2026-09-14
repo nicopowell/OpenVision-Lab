@@ -16,10 +16,10 @@ and understandable application.
 
 ## Current Status
 
-M9 (classical Computer Vision processors) increment 1 is complete: the pipeline
-supports Canny edge detection. Further classical processors are not implemented
-yet. M10 (batch processing and video) and M11 (extensibility and plugins) remain
-conditional.
+M9 (classical Computer Vision processors) increments 1 and 2 are complete: the
+pipeline supports Canny edge detection and adaptive threshold. Further
+classical processors are not implemented yet. M10 (batch processing and video)
+and M11 (extensibility and plugins) remain conditional.
 
 ## Guiding Principles
 
@@ -379,18 +379,26 @@ filtering and thresholding, while keeping the single-image, grayscale pipeline.
 - Edge detection and image gradients.
 - Hysteresis thresholds and how their values affect the result.
 - The Sobel aperture size and its effect on edge detection.
+- Local versus global thresholding, the neighborhood size and constant, and the
+  difference between a flat and a Gaussian mean.
 - How operation order shapes the result.
 
 **Expected result:**
 
 - The pipeline can include a Canny edge detection step.
-- The step keeps its own parameters.
+- The pipeline can include an adaptive threshold step.
+- Each step keeps its own parameters.
 - Results are deterministic and covered by tests.
 
 **New decisions:**
 
 - Public parameter names `low_threshold` and `high_threshold` map to OpenCV's
   `threshold1` and `threshold2`.
+- The adaptive threshold parameter `constant` maps to OpenCV's `C`, and
+  `use_gaussian` selects between the mean and Gaussian methods without adding an
+  enum.
+- Adaptive threshold fixes `maxValue` at 255 and `THRESH_BINARY`, like
+  `binary_threshold`.
 - `PipelineStep` stays flat. A per-processor parameter map is reconsidered when
   a second parameterized processor appears.
 
@@ -407,9 +415,22 @@ filtering and thresholding, while keeping the single-image, grayscale pipeline.
   selected Canny step.
 - Tests cover the processor, pipeline order, persistence, and UI parameters.
 
-Further processors in this milestone (adaptive threshold, histogram
-equalization, morphology) remain to be added one at a time. Processors that
-output color (contours, features, Hough) need a separate architecture decision.
+**Implemented (increment 2):**
+
+- `adaptive_threshold()` in `image_ops.py` validates grayscale input, an odd
+  `block_size` of at least 3, a numeric `constant`, and a boolean
+  `use_gaussian`.
+- `Processor.ADAPTIVE_THRESHOLD`, the flat `block_size`, `constant`, and
+  `use_gaussian` fields on `PipelineStep`, and a branch in `apply_step`.
+- Pipelines are saved and loaded with the adaptive threshold parameters, using
+  the same validation and defaults.
+- The UI shows a block-size spin box, a constant spin box, and a mean/Gaussian
+  selector only for a selected adaptive threshold step.
+- Tests cover the processor, pipeline order, persistence, and UI parameters.
+
+Further processors in this milestone (histogram equalization, morphology) remain
+to be added one at a time. Processors that output color (contours, features,
+Hough) need a separate architecture decision.
 
 ## M10: Batch Processing and Video
 
