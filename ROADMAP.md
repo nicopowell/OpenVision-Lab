@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M6 (testing, quality, and refactoring) is complete. The next milestone is M7:
-undo and redo, which is conditional.
+M7 (undo and redo) is complete. The next milestone is M8: save and load
+pipelines.
 
 ## Guiding Principles
 
@@ -324,6 +324,21 @@ This milestone is conditional. It should only be implemented if editing the
 pipeline becomes complex enough that users need history.
 
 It should initially store pipeline state rather than full image copies.
+
+**Implemented:**
+
+- `PipelineHistory` keeps snapshots of the pipeline (steps and parameters),
+  never image arrays, and drops the redo branch after a new edit.
+- The `Edit` menu provides `Undo` and `Redo` with the standard shortcuts, and
+  they are enabled only when there is a state to return to.
+- Structural edits (add, remove, move) are recorded immediately. Continuous
+  parameter edits are coalesced into a single entry with a short timer.
+- Undo/redo restore the pipeline and re-run it, so the preview and stage
+  selector stay in sync. Loading an image does not reset the history.
+- `tests/test_history.py` covers recording, undo/redo, redo invalidation,
+  snapshot independence, and reset.
+
+**Current status:** Complete.
 
 ## M8: Save and Load Pipelines
 

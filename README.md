@@ -28,6 +28,8 @@ exported.
    step.
 8. Use `File > Save Result As...` to export the final result as PNG, JPEG, BMP,
    or TIFF.
+9. Use `Edit > Undo` (`Ctrl+Z`) and `Edit > Redo` (`Ctrl+Shift+Z`) to step back
+   and forward through pipeline changes.
 
 ## Requirements
 

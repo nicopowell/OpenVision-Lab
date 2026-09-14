@@ -1,6 +1,6 @@
 import numpy as np
-from PySide6.QtCore import Qt
-from PySide6.QtGui import QAction, QPainter, QPixmap
+from PySide6.QtCore import Qt, QTimer
+from PySide6.QtGui import QAction, QKeySequence, QPainter, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -24,6 +24,7 @@ from openvision_lab.image_ops import (
     load_image,
     save_image,
 )
+from openvision_lab.history import PipelineHistory
 from openvision_lab.pipeline import (
     PipelineStep,
     Processor,
@@ -87,6 +88,17 @@ class MainWindow(QMainWindow):
         # the default steps but is a plain list that can be changed.
         self.steps = default_pipeline()
 
+        # Undo/redo history of the pipeline (structure and parameters only).
+        self.history = PipelineHistory(self.steps)
+
+        # Continuous parameter edits are coalesced into a single history entry:
+        # the timer restarts on every change and commits once editing pauses.
+        self._parameter_commit_pending = False
+        self._parameter_timer = QTimer(self)
+        self._parameter_timer.setSingleShot(True)
+        self._parameter_timer.setInterval(400)
+        self._parameter_timer.timeout.connect(self._commit_parameters)
+
         # results[0] is the original image and results[k] is the output after
         # the first k steps, so the last element is the final result.
         self.intermediates: list[np.ndarray] = []
@@ -142,6 +154,20 @@ class MainWindow(QMainWindow):
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(open_action)
         file_menu.addAction(self.save_action)
+
+        self.undo_action = QAction("Undo", self)
+        self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
+        self.undo_action.setEnabled(False)
+        self.undo_action.triggered.connect(self.undo)
+
+        self.redo_action = QAction("Redo", self)
+        self.redo_action.setShortcut(QKeySequence.StandardKey.Redo)
+        self.redo_action.setEnabled(False)
+        self.redo_action.triggered.connect(self.redo)
+
+        edit_menu = self.menuBar().addMenu("Edit")
+        edit_menu.addAction(self.undo_action)
+        edit_menu.addAction(self.redo_action)
 
         self.resize(1000, 600)
 
@@ -295,27 +321,85 @@ class MainWindow(QMainWindow):
         self.step_list.blockSignals(True)
         self.step_list.item(row).setText(self._describe_step(step))
         self.step_list.blockSignals(False)
+        self._schedule_parameter_commit()
 
     def _add_step(self) -> None:
+        self._flush_parameter_commit()
         processor = self.processor_combo.currentData()
         self.steps.append(PipelineStep(processor))
         self._rebuild_step_list(len(self.steps) - 1)
+        self._commit_history()
 
     def _remove_step(self) -> None:
         row = self.step_list.currentRow()
         if not 0 <= row < len(self.steps):
             return
+        self._flush_parameter_commit()
         del self.steps[row]
         self._rebuild_step_list(min(row, len(self.steps) - 1))
+        self._commit_history()
 
     def _move_step(self, delta: int) -> None:
         row = self.step_list.currentRow()
         target = row + delta
         if not (0 <= row < len(self.steps) and 0 <= target < len(self.steps)):
             return
+        self._flush_parameter_commit()
         self.steps[row], self.steps[target] = self.steps[target], self.steps[row]
         # Keep the moved step selected at its new position.
         self._rebuild_step_list(target)
+        self._commit_history()
+
+    def _update_history_actions(self) -> None:
+        self.undo_action.setEnabled(self.history.can_undo)
+        self.redo_action.setEnabled(self.history.can_redo)
+
+    def _commit_history(self) -> None:
+        """Record the current pipeline state as a new history snapshot."""
+        self._parameter_commit_pending = False
+        self._parameter_timer.stop()
+        self.history.record(self.steps)
+        self._update_history_actions()
+
+    def _schedule_parameter_commit(self) -> None:
+        """Coalesce continuous parameter edits into one history entry."""
+        self._parameter_commit_pending = True
+        self._parameter_timer.start()
+
+    def _flush_parameter_commit(self) -> None:
+        """Record a pending parameter edit before another action happens."""
+        if self._parameter_commit_pending:
+            self._commit_history()
+
+    def _commit_parameters(self) -> None:
+        if self._parameter_commit_pending:
+            self._commit_history()
+
+    def _restore_steps(self, steps: list[PipelineStep]) -> None:
+        """Replace the pipeline with a snapshot and refresh the UI."""
+        previous_row = self.step_list.currentRow()
+        self.steps = steps
+        if self.steps:
+            row = previous_row if 0 <= previous_row < len(self.steps) else 0
+        else:
+            row = 0
+        self._rebuild_step_list(row)
+        self._process()
+        self._update_history_actions()
+
+    def undo(self) -> None:
+        """Restore the previous pipeline state."""
+        self._flush_parameter_commit()
+        steps = self.history.undo()
+        if steps is not None:
+            self._restore_steps(steps)
+
+    def redo(self) -> None:
+        """Restore the next pipeline state."""
+        self._flush_parameter_commit()
+        steps = self.history.redo()
+        if steps is not None:
+            self._restore_steps(steps)
 
     def _update_view_combo(self) -> None:
         """Fill the view combo with the available stages.
