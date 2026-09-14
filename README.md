@@ -8,10 +8,11 @@ an image and build an editable pipeline of processing steps.
 ## Features
 
 - Editable pipeline: add, remove, and reorder processing steps.
-- Four processors: grayscale, Gaussian blur, binary threshold, and Canny edge
-  detection.
-- Per-step parameters (blur kernel size and sigma, threshold value, and Canny
-  hysteresis thresholds and aperture).
+- Five processors: grayscale, Gaussian blur, binary threshold, adaptive
+  threshold, and Canny edge detection.
+- Per-step parameters (blur kernel size and sigma, threshold value, adaptive
+  block size, constant and method, and Canny hysteresis thresholds and
+  aperture).
 - Preview of the final result or any intermediate stage.
 - Export the final result as PNG, JPEG, BMP, or TIFF.
 - Undo and redo for pipeline changes.

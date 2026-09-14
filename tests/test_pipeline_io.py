@@ -74,6 +74,94 @@ def test_canny_step_is_readable_json(tmp_path):
     }
 
 
+def test_round_trip_preserves_adaptive_threshold_step(tmp_path):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(
+            Processor.ADAPTIVE_THRESHOLD,
+            block_size=3,
+            constant=-5.0,
+            use_gaussian=True,
+        ),
+    ]
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), steps)
+
+    assert load_pipeline(str(path)) == steps
+
+
+def test_adaptive_threshold_step_is_readable_json(tmp_path):
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), [PipelineStep(Processor.ADAPTIVE_THRESHOLD)])
+
+    data = json.loads(path.read_text())
+    assert data["steps"][0] == {
+        "processor": "ADAPTIVE_THRESHOLD",
+        "block_size": 11,
+        "constant": 2.0,
+        "use_gaussian": False,
+    }
+
+
+def test_load_adaptive_threshold_uses_defaults_for_missing_parameters(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {"version": 1, "steps": [{"processor": "ADAPTIVE_THRESHOLD"}]},
+    )
+
+    loaded = load_pipeline(path)
+
+    assert loaded[0].block_size == 11
+    assert loaded[0].constant == 2.0
+    assert loaded[0].use_gaussian is False
+
+
+@pytest.mark.parametrize("block_size", [1, 2, 4, 0, -3, True, 5.5, "7"])
+def test_load_invalid_adaptive_block_size_raises(tmp_path, block_size):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "ADAPTIVE_THRESHOLD", "block_size": block_size}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("constant", ["2", True, None])
+def test_load_invalid_adaptive_constant_raises(tmp_path, constant):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "ADAPTIVE_THRESHOLD", "constant": constant}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("use_gaussian", [0, 1, "yes", None])
+def test_load_invalid_adaptive_method_raises(tmp_path, use_gaussian):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [
+                {"processor": "ADAPTIVE_THRESHOLD", "use_gaussian": use_gaussian}
+            ],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
 def test_saved_file_is_readable_json(tmp_path):
     path = tmp_path / "pipeline.json"
 

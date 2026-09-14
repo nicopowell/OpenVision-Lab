@@ -70,6 +70,10 @@ def _step_to_dict(step: PipelineStep) -> dict:
         data["sigma"] = step.sigma
     elif step.processor is Processor.BINARY_THRESHOLD:
         data["threshold"] = step.threshold
+    elif step.processor is Processor.ADAPTIVE_THRESHOLD:
+        data["block_size"] = step.block_size
+        data["constant"] = step.constant
+        data["use_gaussian"] = step.use_gaussian
     elif step.processor is Processor.CANNY:
         data["low_threshold"] = step.low_threshold
         data["high_threshold"] = step.high_threshold
@@ -121,6 +125,25 @@ def _parse_step(data: object) -> PipelineStep:
                 f"threshold must be between 0 and 255; got {threshold}."
             )
         return PipelineStep(processor, threshold=threshold)
+
+    if processor is Processor.ADAPTIVE_THRESHOLD:
+        block_size = _parse_int(data.get("block_size", 11), "block_size")
+        if block_size < 3 or block_size % 2 == 0:
+            raise PipelineFileError(
+                f"block_size must be odd and at least 3; got {block_size}."
+            )
+        constant = _parse_number(data.get("constant", 2.0), "constant")
+        use_gaussian = data.get("use_gaussian", False)
+        if not isinstance(use_gaussian, bool):
+            raise PipelineFileError(
+                f"use_gaussian must be a boolean; got {use_gaussian!r}."
+            )
+        return PipelineStep(
+            processor,
+            block_size=block_size,
+            constant=constant,
+            use_gaussian=use_gaussian,
+        )
 
     if processor is Processor.CANNY:
         low_threshold = _parse_int(data.get("low_threshold", 100), "low_threshold")

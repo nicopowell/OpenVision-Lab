@@ -10,6 +10,7 @@ from enum import Enum
 import numpy as np
 
 from openvision_lab.image_ops import (
+    adaptive_threshold,
     binary_threshold,
     canny,
     gaussian_blur,
@@ -26,6 +27,7 @@ class Processor(Enum):
     GRAYSCALE = "Grayscale"
     GAUSSIAN_BLUR = "Gaussian blur"
     BINARY_THRESHOLD = "Binary threshold"
+    ADAPTIVE_THRESHOLD = "Adaptive threshold"
     CANNY = "Canny edges"
 
 
@@ -38,6 +40,12 @@ class PipelineStep:
         kernel_size: Gaussian blur kernel size. Ignored by other processors.
         sigma: Gaussian blur sigma. Ignored by other processors.
         threshold: Binary threshold value. Ignored by other processors.
+        block_size: Adaptive threshold neighborhood size. Ignored by other
+            processors.
+        constant: Adaptive threshold value subtracted from the local mean.
+            Ignored by other processors.
+        use_gaussian: Whether adaptive threshold uses a Gaussian window instead
+            of a flat mean. Ignored by other processors.
         low_threshold: Canny lower hysteresis threshold. Ignored by other
             processors.
         high_threshold: Canny upper hysteresis threshold. Ignored by other
@@ -49,6 +57,9 @@ class PipelineStep:
     kernel_size: int = 5
     sigma: float = 0.0
     threshold: int = 127
+    block_size: int = 11
+    constant: float = 2.0
+    use_gaussian: bool = False
     low_threshold: int = 100
     high_threshold: int = 200
     aperture_size: int = 3
@@ -60,8 +71,9 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
     Args:
         image: Input array. Each processor validates its own expected shape:
             grayscale expects a BGR ``(height, width, 3)`` image and produces a
-            grayscale ``(height, width)`` one, while Gaussian blur and binary
-            threshold expect a grayscale ``(height, width)`` image.
+            grayscale ``(height, width)`` one, while Gaussian blur, binary
+            threshold, adaptive threshold, and Canny expect a grayscale
+            ``(height, width)`` image.
         step: The configured step to apply.
 
     Returns:
@@ -69,22 +81,37 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
 
     Raises:
         ValueError: If the processor is unknown, or if the image does not
-            satisfy the processor's precondition.
+            satisfy the processor's precondition. The message names the
+            processor that failed.
     """
-    if step.processor is Processor.GRAYSCALE:
-        return to_grayscale(image)
-    if step.processor is Processor.GAUSSIAN_BLUR:
-        return gaussian_blur(image, kernel_size=step.kernel_size, sigma=step.sigma)
-    if step.processor is Processor.BINARY_THRESHOLD:
-        return binary_threshold(image, threshold=step.threshold)
-    if step.processor is Processor.CANNY:
-        return canny(
-            image,
-            low_threshold=step.low_threshold,
-            high_threshold=step.high_threshold,
-            aperture_size=step.aperture_size,
-        )
-    raise ValueError(f"Unsupported processor: {step.processor!r}")
+    try:
+        if step.processor is Processor.GRAYSCALE:
+            return to_grayscale(image)
+        if step.processor is Processor.GAUSSIAN_BLUR:
+            return gaussian_blur(image, kernel_size=step.kernel_size, sigma=step.sigma)
+        if step.processor is Processor.BINARY_THRESHOLD:
+            return binary_threshold(image, threshold=step.threshold)
+        if step.processor is Processor.ADAPTIVE_THRESHOLD:
+            return adaptive_threshold(
+                image,
+                block_size=step.block_size,
+                constant=step.constant,
+                use_gaussian=step.use_gaussian,
+            )
+        if step.processor is Processor.CANNY:
+            return canny(
+                image,
+                low_threshold=step.low_threshold,
+                high_threshold=step.high_threshold,
+                aperture_size=step.aperture_size,
+            )
+        raise ValueError(f"Unsupported processor: {step.processor!r}")
+    except ValueError as error:
+        # image_ops describes the specific failure; the pipeline adds which
+        # step caused it, so the UI can show a useful message.
+        raise ValueError(
+            f"Processor {step.processor.value!r} failed: {error}"
+        ) from error
 
 
 def run_pipeline_with_intermediates(
