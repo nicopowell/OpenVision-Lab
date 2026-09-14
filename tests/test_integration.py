@@ -1,6 +1,11 @@
 import numpy as np
 
-from openvision_lab.image_ops import binary_threshold, load_image, save_image, to_grayscale
+from openvision_lab.image_ops import (
+    binary_threshold,
+    load_image,
+    save_image,
+    to_grayscale,
+)
 from openvision_lab.pipeline import (
     PipelineStep,
     Processor,

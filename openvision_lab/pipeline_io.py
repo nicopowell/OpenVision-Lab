@@ -73,7 +73,7 @@ def _step_to_dict(step: PipelineStep) -> dict:
     return data
 
 
-def _parse_pipeline(data) -> list[PipelineStep]:
+def _parse_pipeline(data: object) -> list[PipelineStep]:
     if not isinstance(data, dict):
         raise PipelineFileError("Invalid pipeline: the root must be a JSON object.")
 
@@ -90,7 +90,7 @@ def _parse_pipeline(data) -> list[PipelineStep]:
     return [_parse_step(raw_step) for raw_step in raw_steps]
 
 
-def _parse_step(data) -> PipelineStep:
+def _parse_step(data: object) -> PipelineStep:
     if not isinstance(data, dict):
         raise PipelineFileError("Invalid pipeline: each step must be a JSON object.")
 
@@ -121,13 +121,13 @@ def _parse_step(data) -> PipelineStep:
     return PipelineStep(processor)
 
 
-def _parse_int(value, field: str) -> int:
+def _parse_int(value: object, field: str) -> int:
     if not isinstance(value, int) or isinstance(value, bool):
         raise PipelineFileError(f"{field} must be an integer; got {value!r}.")
     return value
 
 
-def _parse_number(value, field: str) -> float:
+def _parse_number(value: object, field: str) -> float:
     if not isinstance(value, (int, float)) or isinstance(value, bool):
         raise PipelineFileError(f"{field} must be a number; got {value!r}.")
     return float(value)

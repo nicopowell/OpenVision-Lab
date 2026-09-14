@@ -1,6 +1,13 @@
+import os
+
 import cv2
 import numpy as np
 import pytest
+
+
+def pytest_configure(config):
+    # Run the UI tests without a display, both locally and on headless CI.
+    os.environ.setdefault("QT_QPA_PLATFORM", "offscreen")
 
 
 @pytest.fixture

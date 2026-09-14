@@ -1,6 +1,6 @@
 import numpy as np
 from PySide6.QtCore import Qt, QTimer
-from PySide6.QtGui import QAction, QKeySequence, QPainter, QPixmap
+from PySide6.QtGui import QAction, QKeySequence, QPainter, QPaintEvent, QPixmap
 from PySide6.QtWidgets import (
     QComboBox,
     QDoubleSpinBox,
@@ -18,13 +18,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
+from openvision_lab.history import PipelineHistory
 from openvision_lab.image_ops import (
     ImageLoadError,
     ImageSaveError,
     load_image,
     save_image,
 )
-from openvision_lab.history import PipelineHistory
 from openvision_lab.pipeline import (
     PipelineStep,
     Processor,
@@ -61,7 +61,7 @@ class ImageLabel(QLabel):
     def __init__(self) -> None:
         super().__init__()
         self._pixmap = QPixmap()
-        self.setAlignment(Qt.AlignCenter)
+        self.setAlignment(Qt.AlignmentFlag.AlignCenter)
         self.setMinimumSize(320, 240)
 
     def set_array(self, image: np.ndarray) -> None:
@@ -69,11 +69,13 @@ class ImageLabel(QLabel):
         self._pixmap = array_to_qpixmap(image)
         self.update()
 
-    def paintEvent(self, _event) -> None:
+    def paintEvent(self, _event: QPaintEvent) -> None:
         if self._pixmap.isNull():
             return
         scaled = self._pixmap.scaled(
-            self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+            self.size(),
+            Qt.AspectRatioMode.KeepAspectRatio,
+            Qt.TransformationMode.SmoothTransformation,
         )
         painter = QPainter(self)
         x = (self.width() - scaled.width()) // 2
@@ -122,7 +124,7 @@ class MainWindow(QMainWindow):
 
         self.view_combo = QComboBox()
         # Widen the combo to fit the longest stage name instead of truncating.
-        self.view_combo.setSizeAdjustPolicy(QComboBox.AdjustToContents)
+        self.view_combo.setSizeAdjustPolicy(QComboBox.SizeAdjustPolicy.AdjustToContents)
         self.view_combo.currentIndexChanged.connect(self._on_view_changed)
 
         view_layout = QHBoxLayout()

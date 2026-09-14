@@ -112,9 +112,7 @@ def test_load_negative_sigma_raises(tmp_path):
         tmp_path,
         {
             "version": 1,
-            "steps": [
-                {"processor": "GAUSSIAN_BLUR", "kernel_size": 5, "sigma": -1.0}
-            ],
+            "steps": [{"processor": "GAUSSIAN_BLUR", "kernel_size": 5, "sigma": -1.0}],
         },
     )
 
@@ -126,7 +124,10 @@ def test_load_negative_sigma_raises(tmp_path):
 def test_load_invalid_threshold_raises(tmp_path, threshold):
     path = _write_json(
         tmp_path,
-        {"version": 1, "steps": [{"processor": "BINARY_THRESHOLD", "threshold": threshold}]},
+        {
+            "version": 1,
+            "steps": [{"processor": "BINARY_THRESHOLD", "threshold": threshold}],
+        },
     )
 
     with pytest.raises(PipelineFileError):
@@ -163,7 +164,9 @@ def test_load_ignores_unknown_keys(tmp_path):
 
 def test_save_to_invalid_path_raises(tmp_path):
     with pytest.raises(PipelineFileError):
-        save_pipeline(str(tmp_path / "missing_dir" / "pipeline.json"), default_pipeline())
+        save_pipeline(
+            str(tmp_path / "missing_dir" / "pipeline.json"), default_pipeline()
+        )
 
 
 def test_saved_pipeline_runs_the_same(tmp_path):

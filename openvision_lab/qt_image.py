@@ -27,13 +27,13 @@ def array_to_qpixmap(image: np.ndarray) -> QPixmap:
     height, width = array.shape[:2]
     if array.ndim == 2:
         qimage = QImage(
-            array.data, width, height, array.strides[0], QImage.Format_Grayscale8
+            array.data, width, height, array.strides[0], QImage.Format.Format_Grayscale8
         )
     elif array.ndim == 3 and array.shape[2] == 3:
         # Format_BGR888 tells Qt the bytes are ordered B, G, R, which matches
         # OpenCV's default. Naming the right format avoids converting BGR->RGB.
         qimage = QImage(
-            array.data, width, height, array.strides[0], QImage.Format_BGR888
+            array.data, width, height, array.strides[0], QImage.Format.Format_BGR888
         )
     else:
         raise ValueError(f"Unsupported image shape for display: {array.shape}")
