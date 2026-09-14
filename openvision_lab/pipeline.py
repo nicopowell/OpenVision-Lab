@@ -9,7 +9,12 @@ from enum import Enum
 
 import numpy as np
 
-from openvision_lab.image_ops import binary_threshold, gaussian_blur, to_grayscale
+from openvision_lab.image_ops import (
+    binary_threshold,
+    canny,
+    gaussian_blur,
+    to_grayscale,
+)
 
 
 class Processor(Enum):
@@ -21,6 +26,7 @@ class Processor(Enum):
     GRAYSCALE = "Grayscale"
     GAUSSIAN_BLUR = "Gaussian blur"
     BINARY_THRESHOLD = "Binary threshold"
+    CANNY = "Canny edges"
 
 
 @dataclass
@@ -32,12 +38,20 @@ class PipelineStep:
         kernel_size: Gaussian blur kernel size. Ignored by other processors.
         sigma: Gaussian blur sigma. Ignored by other processors.
         threshold: Binary threshold value. Ignored by other processors.
+        low_threshold: Canny lower hysteresis threshold. Ignored by other
+            processors.
+        high_threshold: Canny upper hysteresis threshold. Ignored by other
+            processors.
+        aperture_size: Canny Sobel aperture size. Ignored by other processors.
     """
 
     processor: Processor
     kernel_size: int = 5
     sigma: float = 0.0
     threshold: int = 127
+    low_threshold: int = 100
+    high_threshold: int = 200
+    aperture_size: int = 3
 
 
 def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
@@ -63,6 +77,13 @@ def apply_step(image: np.ndarray, step: PipelineStep) -> np.ndarray:
         return gaussian_blur(image, kernel_size=step.kernel_size, sigma=step.sigma)
     if step.processor is Processor.BINARY_THRESHOLD:
         return binary_threshold(image, threshold=step.threshold)
+    if step.processor is Processor.CANNY:
+        return canny(
+            image,
+            low_threshold=step.low_threshold,
+            high_threshold=step.high_threshold,
+            aperture_size=step.aperture_size,
+        )
     raise ValueError(f"Unsupported processor: {step.processor!r}")
 
 

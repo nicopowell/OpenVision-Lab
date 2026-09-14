@@ -70,6 +70,10 @@ def _step_to_dict(step: PipelineStep) -> dict:
         data["sigma"] = step.sigma
     elif step.processor is Processor.BINARY_THRESHOLD:
         data["threshold"] = step.threshold
+    elif step.processor is Processor.CANNY:
+        data["low_threshold"] = step.low_threshold
+        data["high_threshold"] = step.high_threshold
+        data["aperture_size"] = step.aperture_size
     return data
 
 
@@ -117,6 +121,34 @@ def _parse_step(data: object) -> PipelineStep:
                 f"threshold must be between 0 and 255; got {threshold}."
             )
         return PipelineStep(processor, threshold=threshold)
+
+    if processor is Processor.CANNY:
+        low_threshold = _parse_int(data.get("low_threshold", 100), "low_threshold")
+        high_threshold = _parse_int(data.get("high_threshold", 200), "high_threshold")
+        for name, value in (
+            ("low_threshold", low_threshold),
+            ("high_threshold", high_threshold),
+        ):
+            if not 0 <= value <= 255:
+                raise PipelineFileError(
+                    f"{name} must be between 0 and 255; got {value}."
+                )
+        if low_threshold > high_threshold:
+            raise PipelineFileError(
+                "low_threshold must be less than or equal to high_threshold; "
+                f"got {low_threshold} > {high_threshold}."
+            )
+        aperture_size = _parse_int(data.get("aperture_size", 3), "aperture_size")
+        if aperture_size not in (3, 5, 7):
+            raise PipelineFileError(
+                f"aperture_size must be 3, 5, or 7; got {aperture_size}."
+            )
+        return PipelineStep(
+            processor,
+            low_threshold=low_threshold,
+            high_threshold=high_threshold,
+            aperture_size=aperture_size,
+        )
 
     return PipelineStep(processor)
 

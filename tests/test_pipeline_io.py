@@ -43,6 +43,37 @@ def test_round_trip_empty_pipeline(tmp_path):
     assert load_pipeline(str(path)) == []
 
 
+def test_round_trip_preserves_canny_step(tmp_path):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(
+            Processor.CANNY,
+            low_threshold=50,
+            high_threshold=150,
+            aperture_size=5,
+        ),
+    ]
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), steps)
+
+    assert load_pipeline(str(path)) == steps
+
+
+def test_canny_step_is_readable_json(tmp_path):
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), [PipelineStep(Processor.CANNY)])
+
+    data = json.loads(path.read_text())
+    assert data["steps"][0] == {
+        "processor": "CANNY",
+        "low_threshold": 100,
+        "high_threshold": 200,
+        "aperture_size": 3,
+    }
+
+
 def test_saved_file_is_readable_json(tmp_path):
     path = tmp_path / "pipeline.json"
 
@@ -142,6 +173,7 @@ def test_load_uses_defaults_for_missing_parameters(tmp_path):
             "steps": [
                 {"processor": "GAUSSIAN_BLUR"},
                 {"processor": "BINARY_THRESHOLD"},
+                {"processor": "CANNY"},
             ],
         },
     )
@@ -151,6 +183,52 @@ def test_load_uses_defaults_for_missing_parameters(tmp_path):
     assert loaded[0].kernel_size == 5
     assert loaded[0].sigma == 0.0
     assert loaded[1].threshold == 127
+    assert loaded[2].low_threshold == 100
+    assert loaded[2].high_threshold == 200
+    assert loaded[2].aperture_size == 3
+
+
+@pytest.mark.parametrize("aperture_size", [1, 2, 4, 9, 5.5, "3"])
+def test_load_invalid_canny_aperture_size_raises(tmp_path, aperture_size):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "CANNY", "aperture_size": aperture_size}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("value", [-1, 256, 1.5, "100"])
+def test_load_invalid_canny_threshold_raises(tmp_path, value):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "CANNY", "low_threshold": value}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+def test_load_canny_low_above_high_raises(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [
+                {"processor": "CANNY", "low_threshold": 200, "high_threshold": 100}
+            ],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
 
 
 def test_load_ignores_unknown_keys(tmp_path):

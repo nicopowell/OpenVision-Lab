@@ -1,7 +1,12 @@
 import numpy as np
 import pytest
 
-from openvision_lab.image_ops import binary_threshold, gaussian_blur, to_grayscale
+from openvision_lab.image_ops import (
+    binary_threshold,
+    canny,
+    gaussian_blur,
+    to_grayscale,
+)
 
 
 def test_to_grayscale_returns_single_channel(bgr_image):
@@ -105,3 +110,73 @@ def test_binary_threshold_rejects_out_of_range_threshold(threshold):
 
     with pytest.raises(ValueError):
         binary_threshold(image, threshold=threshold)
+
+
+def test_canny_preserves_shape_and_dtype(gray_image):
+    edges = canny(gray_image)
+
+    assert edges.shape == gray_image.shape
+    assert edges.dtype == np.uint8
+
+
+def test_canny_outputs_only_black_and_white(gray_image):
+    edges = canny(gray_image)
+
+    assert set(np.unique(edges)).issubset({0, 255})
+
+
+def test_canny_constant_image_has_no_edges():
+    image = np.full((6, 6), 100, dtype=np.uint8)
+
+    edges = canny(image)
+
+    assert not np.any(edges)
+
+
+def test_canny_detects_a_brightness_step():
+    image = np.zeros((16, 16), dtype=np.uint8)
+    image[:, 8:] = 255
+
+    edges = canny(image)
+
+    assert np.any(edges)
+
+
+def test_canny_rejects_color_input(bgr_image):
+    with pytest.raises(ValueError):
+        canny(bgr_image)
+
+
+def test_canny_accepts_custom_parameters():
+    image = np.zeros((8, 8), dtype=np.uint8)
+    image[:, 4:] = 255
+
+    edges = canny(image, low_threshold=50, high_threshold=150, aperture_size=5)
+
+    assert edges.shape == (8, 8)
+    assert edges.dtype == np.uint8
+
+
+@pytest.mark.parametrize("aperture_size", [1, 2, 4, 9, 5.5, "3"])
+def test_canny_rejects_invalid_aperture_size(aperture_size):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        canny(image, aperture_size=aperture_size)
+
+
+@pytest.mark.parametrize("value", [-1, 256, 1.5, "100"])
+def test_canny_rejects_invalid_thresholds(value):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        canny(image, low_threshold=value)
+    with pytest.raises(ValueError):
+        canny(image, high_threshold=value)
+
+
+def test_canny_rejects_low_threshold_above_high():
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        canny(image, low_threshold=200, high_threshold=100)

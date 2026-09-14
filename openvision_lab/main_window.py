@@ -239,10 +239,30 @@ class MainWindow(QMainWindow):
         self.threshold_spin.setRange(0, 255)
         self.threshold_spin.valueChanged.connect(self._on_parameters_changed)
 
+        # Canny uses the same 0-255 range for both hysteresis thresholds.
+        self.low_threshold_spin = QSpinBox()
+        self.low_threshold_spin.setRange(0, 255)
+        self.low_threshold_spin.valueChanged.connect(self._on_parameters_changed)
+
+        self.high_threshold_spin = QSpinBox()
+        self.high_threshold_spin.setRange(0, 255)
+        self.high_threshold_spin.valueChanged.connect(self._on_parameters_changed)
+
+        # Only 3, 5, or 7 are valid Sobel aperture sizes, but the range is left
+        # wide (like the blur kernel) so a value typed by the user is not
+        # silently clamped. canny() rejects it and _process shows the reason.
+        self.aperture_spin = QSpinBox()
+        self.aperture_spin.setRange(1, 31)
+        self.aperture_spin.setSingleStep(2)
+        self.aperture_spin.valueChanged.connect(self._on_parameters_changed)
+
         self.parameters_form = QFormLayout()
         self.parameters_form.addRow("Blur kernel size", self.kernel_spin)
         self.parameters_form.addRow("Blur sigma", self.sigma_spin)
         self.parameters_form.addRow("Threshold", self.threshold_spin)
+        self.parameters_form.addRow("Canny low threshold", self.low_threshold_spin)
+        self.parameters_form.addRow("Canny high threshold", self.high_threshold_spin)
+        self.parameters_form.addRow("Canny aperture", self.aperture_spin)
 
         self.apply_button = QPushButton("Apply")
         self.apply_button.setEnabled(False)
@@ -264,6 +284,11 @@ class MainWindow(QMainWindow):
             return f"{step.processor.value} (k={step.kernel_size}, sigma={step.sigma})"
         if step.processor is Processor.BINARY_THRESHOLD:
             return f"{step.processor.value} (t={step.threshold})"
+        if step.processor is Processor.CANNY:
+            return (
+                f"{step.processor.value} "
+                f"(low={step.low_threshold}, high={step.high_threshold})"
+            )
         return step.processor.value
 
     def _selected_step(self) -> PipelineStep | None:
@@ -308,16 +333,23 @@ class MainWindow(QMainWindow):
             is_threshold = (
                 step is not None and step.processor is Processor.BINARY_THRESHOLD
             )
+            is_canny = step is not None and step.processor is Processor.CANNY
             # Rows that do not apply to the selected processor are hidden.
             self.parameters_form.setRowVisible(self.kernel_spin, is_blur)
             self.parameters_form.setRowVisible(self.sigma_spin, is_blur)
             self.parameters_form.setRowVisible(self.threshold_spin, is_threshold)
+            self.parameters_form.setRowVisible(self.low_threshold_spin, is_canny)
+            self.parameters_form.setRowVisible(self.high_threshold_spin, is_canny)
+            self.parameters_form.setRowVisible(self.aperture_spin, is_canny)
 
             if step is None:
                 return
             self.kernel_spin.setValue(step.kernel_size)
             self.sigma_spin.setValue(step.sigma)
             self.threshold_spin.setValue(step.threshold)
+            self.low_threshold_spin.setValue(step.low_threshold)
+            self.high_threshold_spin.setValue(step.high_threshold)
+            self.aperture_spin.setValue(step.aperture_size)
         finally:
             self._loading_step = False
 
@@ -333,6 +365,10 @@ class MainWindow(QMainWindow):
             step.sigma = self.sigma_spin.value()
         elif step.processor is Processor.BINARY_THRESHOLD:
             step.threshold = self.threshold_spin.value()
+        elif step.processor is Processor.CANNY:
+            step.low_threshold = self.low_threshold_spin.value()
+            step.high_threshold = self.high_threshold_spin.value()
+            step.aperture_size = self.aperture_spin.value()
 
         row = self.step_list.currentRow()
         self.step_list.blockSignals(True)

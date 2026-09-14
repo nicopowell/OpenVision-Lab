@@ -9,7 +9,7 @@ from the Qt interface so it can be understood and tested on its own.
 
 | Module | Responsibility |
 | --- | --- |
-| `image_ops.py` | OpenCV primitives: load, save, grayscale, Gaussian blur, binary threshold. No Qt. |
+| `image_ops.py` | OpenCV primitives: load, save, grayscale, Gaussian blur, binary threshold, Canny. No Qt. |
 | `pipeline.py` | Pipeline model: `Processor`, `PipelineStep`, `apply_step`, `run_pipeline`, `run_pipeline_with_intermediates`, `default_pipeline`. |
 | `pipeline_io.py` | Save and load pipelines as JSON, with validation. |
 | `history.py` | Snapshot-based undo and redo of the pipeline. |
@@ -20,9 +20,10 @@ from the Qt interface so it can be understood and tested on its own.
 ## Data flow
 
 `load_image` returns a BGR `uint8` array of shape `(H, W, 3)`. Each step takes
-an image and returns one; grayscale and binary threshold output `(H, W)`.
-`run_pipeline_with_intermediates` keeps the input plus the output of every
-step, so index 0 is the original and index `k` is the result after `k` steps.
+an image and returns one; grayscale, binary threshold, and Canny output
+`(H, W)`. `run_pipeline_with_intermediates` keeps the input plus the output of
+every step, so index 0 is the original and index `k` is the result after `k`
+steps.
 
 ## Key decisions
 
@@ -52,7 +53,13 @@ the parameters that apply to it:
   "steps": [
     {"processor": "GRAYSCALE"},
     {"processor": "GAUSSIAN_BLUR", "kernel_size": 5, "sigma": 0.0},
-    {"processor": "BINARY_THRESHOLD", "threshold": 127}
+    {"processor": "BINARY_THRESHOLD", "threshold": 127},
+    {
+      "processor": "CANNY",
+      "low_threshold": 100,
+      "high_threshold": 200,
+      "aperture_size": 3
+    }
   ]
 }
 ```

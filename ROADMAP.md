@@ -16,8 +16,10 @@ and understandable application.
 
 ## Current Status
 
-M8 (save and load pipelines) is complete. The next milestone is M9: batch
-processing and video, which is conditional.
+M9 (classical Computer Vision processors) increment 1 is complete: the pipeline
+supports Canny edge detection. Further classical processors are not implemented
+yet. M10 (batch processing and video) and M11 (extensibility and plugins) remain
+conditional.
 
 ## Guiding Principles
 
@@ -29,7 +31,8 @@ processing and video, which is conditional.
 - Let the architecture evolve with the project.
 - Keep image-processing logic separate from the user interface.
 - Introduce tests progressively from M1 onward.
-- M7 through M10 are optional extensions, not current commitments.
+- M10 and M11 are optional extensions, not current commitments. M9 is the
+  active milestone.
 - Keep cross-platform compatibility when it does not add unnecessary complexity.
 
 ## M0: Bootstrap
@@ -366,7 +369,49 @@ validation should be added only as needed.
 
 **Current status:** Complete.
 
-## M9: Batch Processing and Video
+## M9: Classical Computer Vision Processors
+
+**Objective:** Add classic Computer Vision processors that go beyond basic
+filtering and thresholding, while keeping the single-image, grayscale pipeline.
+
+**Learning focus:**
+
+- Edge detection and image gradients.
+- Hysteresis thresholds and how their values affect the result.
+- The Sobel aperture size and its effect on edge detection.
+- How operation order shapes the result.
+
+**Expected result:**
+
+- The pipeline can include a Canny edge detection step.
+- The step keeps its own parameters.
+- Results are deterministic and covered by tests.
+
+**New decisions:**
+
+- Public parameter names `low_threshold` and `high_threshold` map to OpenCV's
+  `threshold1` and `threshold2`.
+- `PipelineStep` stays flat. A per-processor parameter map is reconsidered when
+  a second parameterized processor appears.
+
+**Implemented (increment 1):**
+
+- `canny()` in `image_ops.py` validates grayscale input, integer thresholds in
+  0-255, `low_threshold` less than or equal to `high_threshold`, and an
+  aperture size of 3, 5, or 7.
+- `Processor.CANNY`, the flat `low_threshold`, `high_threshold`, and
+  `aperture_size` fields on `PipelineStep`, and a branch in `apply_step`.
+- Pipelines are saved and loaded with the Canny parameters, using the same
+  validation and defaults.
+- The UI shows spin boxes for both thresholds and the aperture only for a
+  selected Canny step.
+- Tests cover the processor, pipeline order, persistence, and UI parameters.
+
+Further processors in this milestone (adaptive threshold, histogram
+equalization, morphology) remain to be added one at a time. Processors that
+output color (contours, features, Hough) need a separate architecture decision.
+
+## M10: Batch Processing and Video
 
 **Objective:** Apply stable image pipelines to multiple images and,
 eventually, video frames.
@@ -386,7 +431,7 @@ Video introduces additional concerns:
 This milestone is conditional and should not influence the initial image
 architecture prematurely.
 
-## M10: Extensibility and Plugins
+## M11: Extensibility and Plugins
 
 **Objective:** Support external processors only if a concrete need appears.
 

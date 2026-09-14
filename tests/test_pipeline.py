@@ -1,7 +1,12 @@
 import numpy as np
 import pytest
 
-from openvision_lab.image_ops import binary_threshold, gaussian_blur, to_grayscale
+from openvision_lab.image_ops import (
+    binary_threshold,
+    canny,
+    gaussian_blur,
+    to_grayscale,
+)
 from openvision_lab.pipeline import (
     PipelineStep,
     Processor,
@@ -76,6 +81,45 @@ def test_step_uses_its_own_parameters():
 def test_incompatible_order_raises_value_error(bgr_image):
     steps = [
         PipelineStep(Processor.BINARY_THRESHOLD, threshold=127),
+        PipelineStep(Processor.GRAYSCALE),
+    ]
+
+    with pytest.raises(ValueError):
+        run_pipeline(bgr_image, steps)
+
+
+def test_canny_step_runs_after_grayscale(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.CANNY),
+    ]
+
+    expected = canny(to_grayscale(bgr_image))
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_canny_step_uses_its_own_parameters(bgr_image):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(
+            Processor.CANNY,
+            low_threshold=50,
+            high_threshold=150,
+            aperture_size=5,
+        ),
+    ]
+
+    expected = canny(
+        to_grayscale(bgr_image), low_threshold=50, high_threshold=150, aperture_size=5
+    )
+
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
+
+
+def test_canny_before_grayscale_raises_value_error(bgr_image):
+    steps = [
+        PipelineStep(Processor.CANNY),
         PipelineStep(Processor.GRAYSCALE),
     ]
 

@@ -163,3 +163,67 @@ def binary_threshold(image: np.ndarray, *, threshold: int = 127) -> np.ndarray:
     # cv2.threshold returns (retval, dst); only the thresholded image matters.
     _, result = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
     return result
+
+
+def canny(
+    image: np.ndarray,
+    *,
+    low_threshold: int = 100,
+    high_threshold: int = 200,
+    aperture_size: int = 3,
+) -> np.ndarray:
+    """Detect edges in a grayscale image with the Canny algorithm.
+
+    Canny finds locations where the brightness changes sharply. It computes the
+    image gradient, keeps only local maxima (thin edges), and uses two
+    thresholds for hysteresis: strong edges above ``high_threshold`` are kept,
+    and weak edges above ``low_threshold`` are kept only when they connect to a
+    strong edge.
+
+    Args:
+        image: Grayscale image of shape ``(height, width)`` and dtype ``uint8``.
+        low_threshold: Lower hysteresis threshold. It must be an integer between
+            0 and 255. Lower values keep more weak edges.
+        high_threshold: Upper hysteresis threshold. It must be an integer between
+            0 and 255 and greater than or equal to ``low_threshold``. Higher
+            values keep fewer strong edges.
+        aperture_size: Size of the Sobel kernel used for the gradient. OpenCV
+            only accepts 3, 5, or 7.
+
+    Returns:
+        A ``uint8`` array with the same shape, where edge pixels are 255 and the
+        rest are 0.
+
+    Raises:
+        ValueError: If ``image`` is not a single-channel grayscale image, if a
+            threshold is not an integer between 0 and 255, if ``low_threshold``
+            is greater than ``high_threshold``, or if ``aperture_size`` is not
+            3, 5, or 7.
+    """
+    _require_grayscale(image)
+    for name, value in (
+        ("low_threshold", low_threshold),
+        ("high_threshold", high_threshold),
+    ):
+        if not isinstance(value, int) or isinstance(value, bool):
+            raise ValueError(f"{name} must be an integer; got {value!r}.")
+        if not 0 <= value <= 255:
+            raise ValueError(f"{name} must be between 0 and 255; got {value}.")
+    if low_threshold > high_threshold:
+        raise ValueError(
+            "low_threshold must be less than or equal to high_threshold; "
+            f"got {low_threshold} > {high_threshold}."
+        )
+    if not isinstance(aperture_size, int) or isinstance(aperture_size, bool):
+        raise ValueError(f"aperture_size must be an integer; got {aperture_size!r}.")
+    if aperture_size not in (3, 5, 7):
+        raise ValueError(f"aperture_size must be 3, 5, or 7; got {aperture_size}.")
+
+    # OpenCV names the hysteresis thresholds threshold1 (low) and threshold2
+    # (high), so the public names are mapped to those keyword arguments here.
+    return cv2.Canny(
+        image,
+        threshold1=low_threshold,
+        threshold2=high_threshold,
+        apertureSize=aperture_size,
+    )
