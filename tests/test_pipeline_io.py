@@ -162,6 +162,71 @@ def test_load_invalid_adaptive_method_raises(tmp_path, use_gaussian):
         load_pipeline(path)
 
 
+def test_round_trip_preserves_morphology_step(tmp_path):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.MORPHOLOGY, kernel_size=7, use_closing=True),
+    ]
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), steps)
+
+    assert load_pipeline(str(path)) == steps
+
+
+def test_morphology_step_is_readable_json(tmp_path):
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), [PipelineStep(Processor.MORPHOLOGY)])
+
+    data = json.loads(path.read_text())
+    assert data["steps"][0] == {
+        "processor": "MORPHOLOGY",
+        "kernel_size": 5,
+        "use_closing": False,
+    }
+
+
+def test_load_morphology_uses_defaults_for_missing_parameters(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {"version": 1, "steps": [{"processor": "MORPHOLOGY"}]},
+    )
+
+    loaded = load_pipeline(path)
+
+    assert loaded[0].kernel_size == 5
+    assert loaded[0].use_closing is False
+
+
+@pytest.mark.parametrize("kernel_size", [1, 0, -3, 2, 4, True, 5.5, "5"])
+def test_load_invalid_morphology_kernel_size_raises(tmp_path, kernel_size):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "MORPHOLOGY", "kernel_size": kernel_size}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("use_closing", [0, 1, "close", None])
+def test_load_invalid_morphology_operation_raises(tmp_path, use_closing):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [{"processor": "MORPHOLOGY", "use_closing": use_closing}],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
 def test_saved_file_is_readable_json(tmp_path):
     path = tmp_path / "pipeline.json"
 

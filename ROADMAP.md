@@ -16,10 +16,11 @@ and understandable application.
 
 ## Current Status
 
-M9 (classical Computer Vision processors) increments 1 and 2 are complete: the
-pipeline supports Canny edge detection and adaptive threshold. Further
-classical processors are not implemented yet. M10 (batch processing and video)
-and M11 (extensibility and plugins) remain conditional.
+M9 (classical Computer Vision processors) increments 1, 2, and 3 are complete:
+the pipeline supports Canny edge detection, adaptive threshold, and morphology
+(opening/closing). Further classical processors are not implemented yet. M10
+(batch processing and video) and M11 (extensibility and plugins) remain
+conditional.
 
 ## Guiding Principles
 
@@ -381,12 +382,15 @@ filtering and thresholding, while keeping the single-image, grayscale pipeline.
 - The Sobel aperture size and its effect on edge detection.
 - Local versus global thresholding, the neighborhood size and constant, and the
   difference between a flat and a Gaussian mean.
+- Morphological opening and closing, and the effect of the structuring element
+  size.
 - How operation order shapes the result.
 
 **Expected result:**
 
 - The pipeline can include a Canny edge detection step.
 - The pipeline can include an adaptive threshold step.
+- The pipeline can include a morphology step (opening or closing).
 - Each step keeps its own parameters.
 - Results are deterministic and covered by tests.
 
@@ -399,8 +403,12 @@ filtering and thresholding, while keeping the single-image, grayscale pipeline.
   enum.
 - Adaptive threshold fixes `maxValue` at 255 and `THRESH_BINARY`, like
   `binary_threshold`.
+- Morphology exposes opening and closing through the boolean `use_closing`, and
+  reuses the flat `kernel_size` field shared with Gaussian blur. The structuring
+  element shape (`MORPH_ELLIPSE`) and `iterations` are fixed for now.
 - `PipelineStep` stays flat. A per-processor parameter map is reconsidered when
-  a second parameterized processor appears.
+  a processor needs a categorical parameter with more than two options or a
+  shared field becomes ambiguous.
 
 **Implemented (increment 1):**
 
@@ -428,9 +436,22 @@ filtering and thresholding, while keeping the single-image, grayscale pipeline.
   selector only for a selected adaptive threshold step.
 - Tests cover the processor, pipeline order, persistence, and UI parameters.
 
-Further processors in this milestone (histogram equalization, morphology) remain
-to be added one at a time. Processors that output color (contours, features,
-Hough) need a separate architecture decision.
+**Implemented (increment 3):**
+
+- `morphology()` in `image_ops.py` validates grayscale input, an odd
+  `kernel_size` of at least 3, and a boolean `use_closing`. It uses a fixed
+  elliptical structuring element and a single iteration.
+- `Processor.MORPHOLOGY`, the flat `use_closing` field on `PipelineStep`
+  (sharing `kernel_size` with Gaussian blur), and a branch in `apply_step`.
+- Pipelines are saved and loaded with `kernel_size` and `use_closing`, using the
+  same validation and defaults.
+- The UI shows the shared kernel-size spin box and an opening/closing selector
+  only for a selected morphology step.
+- Tests cover the processor, pipeline order, persistence, and UI parameters.
+
+Further processors in this milestone (histogram equalization, more morphology
+operations) remain to be added one at a time. Processors that output color
+(contours, features, Hough) need a separate architecture decision.
 
 ## M10: Batch Processing and Video
 

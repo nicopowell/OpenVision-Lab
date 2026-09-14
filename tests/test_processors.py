@@ -6,6 +6,7 @@ from openvision_lab.image_ops import (
     binary_threshold,
     canny,
     gaussian_blur,
+    morphology,
     to_grayscale,
 )
 
@@ -259,3 +260,81 @@ def test_adaptive_threshold_rejects_non_boolean_method(use_gaussian):
 
     with pytest.raises(ValueError):
         adaptive_threshold(image, use_gaussian=use_gaussian)
+
+
+def test_morphology_preserves_shape_and_dtype(gray_image):
+    result = morphology(gray_image)
+
+    assert result.shape == gray_image.shape
+    assert result.dtype == np.uint8
+
+
+def test_morphology_rejects_color_input(bgr_image):
+    with pytest.raises(ValueError):
+        morphology(bgr_image)
+
+
+def test_morphology_opening_removes_isolated_bright_pixel():
+    image = np.zeros((9, 9), dtype=np.uint8)
+    image[4, 4] = 255
+
+    result = morphology(image, kernel_size=3)
+
+    np.testing.assert_array_equal(result, np.zeros((9, 9), dtype=np.uint8))
+
+
+def test_morphology_opening_keeps_a_large_region():
+    image = np.zeros((9, 9), dtype=np.uint8)
+    image[2:7, 2:7] = 255
+
+    result = morphology(image, kernel_size=3)
+
+    # Opening rounds the corners of a large region but keeps its center.
+    assert np.all(result[3:6, 3:6] == 255)
+
+
+def test_morphology_closing_fills_a_small_hole():
+    image = np.full((9, 9), 255, dtype=np.uint8)
+    image[4, 4] = 0
+
+    result = morphology(image, kernel_size=3, use_closing=True)
+
+    np.testing.assert_array_equal(result, np.full((9, 9), 255, dtype=np.uint8))
+
+
+def test_morphology_opening_and_closing_differ():
+    image = np.zeros((11, 11), dtype=np.uint8)
+    image[2:9, 2:9] = 255
+    image[5, 5] = 0
+    image[1, 1] = 255
+
+    opened = morphology(image, kernel_size=3)
+    closed = morphology(image, kernel_size=3, use_closing=True)
+
+    assert not np.array_equal(opened, closed)
+
+
+def test_morphology_larger_kernel_removes_more():
+    image = np.zeros((11, 11), dtype=np.uint8)
+    image[3:8, 3:8] = 255
+
+    small = morphology(image, kernel_size=3)
+    large = morphology(image, kernel_size=7)
+
+    assert np.count_nonzero(large) <= np.count_nonzero(small)
+
+
+@pytest.mark.parametrize("kernel_size", [1, 0, -3, 2, 4, True, 5.5, "5"])
+def test_morphology_rejects_invalid_kernel_size(kernel_size):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        morphology(image, kernel_size=kernel_size)
+
+
+@pytest.mark.parametrize("use_closing", [0, 1, "close", None])
+def test_morphology_rejects_non_boolean_operation(use_closing):
+    image = np.zeros((5, 5), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        morphology(image, use_closing=use_closing)

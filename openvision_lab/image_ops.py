@@ -288,3 +288,46 @@ def adaptive_threshold(
         block_size,
         constant,
     )
+
+
+def morphology(
+    image: np.ndarray,
+    *,
+    kernel_size: int = 5,
+    use_closing: bool = False,
+) -> np.ndarray:
+    """Apply a morphological opening or closing to a grayscale image.
+
+    Morphology slides a structuring element over the image. Opening erodes and
+    then dilates, which removes small bright spots and thin protrusions from the
+    foreground. Closing dilates and then erodes, which fills small dark holes
+    and gaps in the foreground. Both keep the overall size of larger regions.
+
+    Args:
+        image: Grayscale image of shape ``(height, width)`` and dtype ``uint8``.
+        kernel_size: Side length of the square structuring element. It must be
+            an odd integer greater than or equal to 3. Larger values remove
+            bigger spots or fill bigger holes.
+        use_closing: When ``True``, apply a closing instead of an opening.
+
+    Returns:
+        A ``uint8`` array with the same shape as the input.
+
+    Raises:
+        ValueError: If ``image`` is not a single-channel grayscale image, if
+            ``kernel_size`` is not an odd integer of at least 3, or if
+            ``use_closing`` is not a boolean.
+    """
+    _require_grayscale(image)
+    if not isinstance(kernel_size, int) or isinstance(kernel_size, bool):
+        raise ValueError(f"kernel_size must be an integer; got {kernel_size!r}.")
+    if kernel_size < 3 or kernel_size % 2 == 0:
+        raise ValueError(f"kernel_size must be odd and at least 3; got {kernel_size}.")
+    if not isinstance(use_closing, bool):
+        raise ValueError(f"use_closing must be a boolean; got {use_closing!r}.")
+
+    # The shape and iterations are fixed for now: an elliptical element is a
+    # good default, and a single pass keeps the effect easy to reason about.
+    operation = cv2.MORPH_CLOSE if use_closing else cv2.MORPH_OPEN
+    kernel = cv2.getStructuringElement(cv2.MORPH_ELLIPSE, (kernel_size, kernel_size))
+    return cv2.morphologyEx(image, operation, kernel, iterations=1)

@@ -74,6 +74,9 @@ def _step_to_dict(step: PipelineStep) -> dict:
         data["block_size"] = step.block_size
         data["constant"] = step.constant
         data["use_gaussian"] = step.use_gaussian
+    elif step.processor is Processor.MORPHOLOGY:
+        data["kernel_size"] = step.kernel_size
+        data["use_closing"] = step.use_closing
     elif step.processor is Processor.CANNY:
         data["low_threshold"] = step.low_threshold
         data["high_threshold"] = step.high_threshold
@@ -143,6 +146,23 @@ def _parse_step(data: object) -> PipelineStep:
             block_size=block_size,
             constant=constant,
             use_gaussian=use_gaussian,
+        )
+
+    if processor is Processor.MORPHOLOGY:
+        kernel_size = _parse_int(data.get("kernel_size", 5), "kernel_size")
+        if kernel_size < 3 or kernel_size % 2 == 0:
+            raise PipelineFileError(
+                f"kernel_size must be odd and at least 3; got {kernel_size}."
+            )
+        use_closing = data.get("use_closing", False)
+        if not isinstance(use_closing, bool):
+            raise PipelineFileError(
+                f"use_closing must be a boolean; got {use_closing!r}."
+            )
+        return PipelineStep(
+            processor,
+            kernel_size=kernel_size,
+            use_closing=use_closing,
         )
 
     if processor is Processor.CANNY:

@@ -222,8 +222,8 @@ class MainWindow(QMainWindow):
         buttons_layout.addWidget(self.up_button)
         buttons_layout.addWidget(self.down_button)
 
-        # Only odd kernel sizes are valid for Gaussian blur, so the spin box
-        # steps by 2. gaussian_blur() still validates the value defensively.
+        # Only odd kernel sizes are valid for Gaussian blur and morphology, so
+        # the spin box steps by 2. Both processors still validate it.
         self.kernel_spin = QSpinBox()
         self.kernel_spin.setRange(1, 31)
         self.kernel_spin.setSingleStep(2)
@@ -278,13 +278,20 @@ class MainWindow(QMainWindow):
         self.method_combo.addItem("Gaussian", True)
         self.method_combo.currentIndexChanged.connect(self._on_parameters_changed)
 
+        self.morph_combo = QComboBox()
+        # Store the boolean as item data and show the operation name.
+        self.morph_combo.addItem("Opening", False)
+        self.morph_combo.addItem("Closing", True)
+        self.morph_combo.currentIndexChanged.connect(self._on_parameters_changed)
+
         self.parameters_form = QFormLayout()
-        self.parameters_form.addRow("Blur kernel size", self.kernel_spin)
+        self.parameters_form.addRow("Kernel size", self.kernel_spin)
         self.parameters_form.addRow("Blur sigma", self.sigma_spin)
         self.parameters_form.addRow("Threshold", self.threshold_spin)
         self.parameters_form.addRow("Adaptive block size", self.block_size_spin)
         self.parameters_form.addRow("Adaptive constant", self.constant_spin)
         self.parameters_form.addRow("Adaptive method", self.method_combo)
+        self.parameters_form.addRow("Morphology operation", self.morph_combo)
         self.parameters_form.addRow("Canny low threshold", self.low_threshold_spin)
         self.parameters_form.addRow("Canny high threshold", self.high_threshold_spin)
         self.parameters_form.addRow("Canny aperture", self.aperture_spin)
@@ -315,6 +322,9 @@ class MainWindow(QMainWindow):
                 f"{step.processor.value} "
                 f"(block={step.block_size}, C={step.constant}, {method})"
             )
+        if step.processor is Processor.MORPHOLOGY:
+            operation = "closing" if step.use_closing else "opening"
+            return f"{step.processor.value} ({operation}, k={step.kernel_size})"
         if step.processor is Processor.CANNY:
             return (
                 f"{step.processor.value} "
@@ -368,13 +378,18 @@ class MainWindow(QMainWindow):
             is_adaptive = (
                 step is not None and step.processor is Processor.ADAPTIVE_THRESHOLD
             )
-            # Rows that do not apply to the selected processor are hidden.
-            self.parameters_form.setRowVisible(self.kernel_spin, is_blur)
+            is_morphology = step is not None and step.processor is Processor.MORPHOLOGY
+            # Rows that do not apply to the selected processor are hidden. The
+            # kernel size is shared by Gaussian blur and morphology.
+            self.parameters_form.setRowVisible(
+                self.kernel_spin, is_blur or is_morphology
+            )
             self.parameters_form.setRowVisible(self.sigma_spin, is_blur)
             self.parameters_form.setRowVisible(self.threshold_spin, is_threshold)
             self.parameters_form.setRowVisible(self.block_size_spin, is_adaptive)
             self.parameters_form.setRowVisible(self.constant_spin, is_adaptive)
             self.parameters_form.setRowVisible(self.method_combo, is_adaptive)
+            self.parameters_form.setRowVisible(self.morph_combo, is_morphology)
             self.parameters_form.setRowVisible(self.low_threshold_spin, is_canny)
             self.parameters_form.setRowVisible(self.high_threshold_spin, is_canny)
             self.parameters_form.setRowVisible(self.aperture_spin, is_canny)
@@ -387,6 +402,7 @@ class MainWindow(QMainWindow):
             self.block_size_spin.setValue(step.block_size)
             self.constant_spin.setValue(step.constant)
             self.method_combo.setCurrentIndex(1 if step.use_gaussian else 0)
+            self.morph_combo.setCurrentIndex(1 if step.use_closing else 0)
             self.low_threshold_spin.setValue(step.low_threshold)
             self.high_threshold_spin.setValue(step.high_threshold)
             self.aperture_spin.setValue(step.aperture_size)
@@ -409,6 +425,9 @@ class MainWindow(QMainWindow):
             step.block_size = self.block_size_spin.value()
             step.constant = self.constant_spin.value()
             step.use_gaussian = bool(self.method_combo.currentData())
+        elif step.processor is Processor.MORPHOLOGY:
+            step.kernel_size = self.kernel_spin.value()
+            step.use_closing = bool(self.morph_combo.currentData())
         elif step.processor is Processor.CANNY:
             step.low_threshold = self.low_threshold_spin.value()
             step.high_threshold = self.high_threshold_spin.value()
