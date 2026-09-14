@@ -12,8 +12,8 @@ The application loads an image, applies an editable pipeline of image
 operations, and shows the original image next to a preview. Steps can be added,
 removed, and reordered, and each step keeps its own parameters. The available
 processors are grayscale, Gaussian blur, and binary threshold. The preview can
-show the final result or any intermediate stage, and the result can be
-exported.
+show the final result or any intermediate stage, the result can be exported,
+and the pipeline can be saved to and loaded from a JSON file.
 
 ## Usage
 
@@ -30,6 +30,8 @@ exported.
    or TIFF.
 9. Use `Edit > Undo` (`Ctrl+Z`) and `Edit > Redo` (`Ctrl+Shift+Z`) to step back
    and forward through pipeline changes.
+10. Use `File > Save Pipeline...` and `File > Load Pipeline...` to store and
+    reuse the pipeline as a JSON file. Loading resets the undo history.
 
 ## Requirements
 

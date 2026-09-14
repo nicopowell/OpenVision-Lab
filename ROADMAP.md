@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M7 (undo and redo) is complete. The next milestone is M8: save and load
-pipelines.
+M8 (save and load pipelines) is complete. The next milestone is M9: batch
+processing and video, which is conditional.
 
 ## Guiding Principles
 
@@ -349,6 +349,22 @@ parameters.
 
 A simple, readable format such as JSON may be considered. Versioning and
 validation should be added only as needed.
+
+**Implemented:**
+
+- Pipelines are stored as readable JSON with a `version` field and one entry
+  per step. Each step names its processor by the stable `Processor` name and
+  includes only the parameters that apply to it.
+- `save_pipeline()` and `load_pipeline()` live in `pipeline_io.py` and raise
+  `PipelineFileError` on unreadable, malformed, or out-of-range files.
+- Loading validates the file before changing the UI, uses the `PipelineStep`
+  defaults for missing parameters, and ignores unknown keys.
+- The `File` menu provides `Save Pipeline...` and `Load Pipeline...`. Loading a
+  pipeline resets the undo history, so it becomes the new baseline.
+- `tests/test_pipeline_io.py` covers round-trips, the JSON structure, validation
+  errors, defaults, and an end-to-end save/load/run check.
+
+**Current status:** Complete.
 
 ## M9: Batch Processing and Video
 

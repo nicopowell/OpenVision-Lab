@@ -31,6 +31,11 @@ from openvision_lab.pipeline import (
     default_pipeline,
     run_pipeline_with_intermediates,
 )
+from openvision_lab.pipeline_io import (
+    PipelineFileError,
+    load_pipeline,
+    save_pipeline,
+)
 from openvision_lab.qt_image import array_to_qpixmap
 
 # Qt file dialog filter syntax: a description followed by space-separated glob
@@ -42,6 +47,7 @@ SAVE_FILTER = (
     "BMP image (*.bmp);;"
     "TIFF image (*.tif *.tiff)"
 )
+PIPELINE_FILTER = "Pipeline files (*.json);;All files (*)"
 
 
 class ImageLabel(QLabel):
@@ -151,9 +157,18 @@ class MainWindow(QMainWindow):
         self.save_action.setEnabled(False)
         self.save_action.triggered.connect(self.save_result)
 
+        load_pipeline_action = QAction("Load Pipeline...", self)
+        load_pipeline_action.triggered.connect(self.load_pipeline_file)
+
+        save_pipeline_action = QAction("Save Pipeline...", self)
+        save_pipeline_action.triggered.connect(self.save_pipeline_file)
+
         file_menu = self.menuBar().addMenu("File")
         file_menu.addAction(open_action)
         file_menu.addAction(self.save_action)
+        file_menu.addSeparator()
+        file_menu.addAction(load_pipeline_action)
+        file_menu.addAction(save_pipeline_action)
 
         self.undo_action = QAction("Undo", self)
         self.undo_action.setShortcut(QKeySequence.StandardKey.Undo)
@@ -491,3 +506,41 @@ class MainWindow(QMainWindow):
             save_image(path, self.intermediates[-1])
         except ImageSaveError as error:
             QMessageBox.warning(self, "Save Result", str(error))
+
+    def save_pipeline_file(self) -> None:
+        """Save the current pipeline configuration to a JSON file."""
+        path, _ = QFileDialog.getSaveFileName(
+            self, "Save Pipeline", "pipeline.json", PIPELINE_FILTER
+        )
+        if not path:
+            return
+        try:
+            save_pipeline(path, self.steps)
+        except PipelineFileError as error:
+            QMessageBox.warning(self, "Save Pipeline", str(error))
+
+    def load_pipeline_file(self) -> None:
+        """Load a pipeline configuration and make it the new history baseline.
+
+        Loading is not an undoable edit: the history is reset to the loaded
+        pipeline. Errors are shown in a message box instead of being raised.
+        """
+        path, _ = QFileDialog.getOpenFileName(
+            self, "Load Pipeline", "", PIPELINE_FILTER
+        )
+        if not path:
+            return
+        try:
+            steps = load_pipeline(path)
+        except PipelineFileError as error:
+            QMessageBox.warning(self, "Load Pipeline", str(error))
+            return
+
+        # Discard any pending parameter edit before replacing the pipeline.
+        self._parameter_timer.stop()
+        self._parameter_commit_pending = False
+        self.steps = steps
+        self.history.reset(self.steps)
+        self._rebuild_step_list(0)
+        self._process()
+        self._update_history_actions()

@@ -1,0 +1,180 @@
+import json
+
+import numpy as np
+import pytest
+
+from openvision_lab.pipeline import (
+    PipelineStep,
+    Processor,
+    default_pipeline,
+    run_pipeline,
+)
+from openvision_lab.pipeline_io import (
+    PipelineFileError,
+    load_pipeline,
+    save_pipeline,
+)
+
+
+def _write_json(tmp_path, data) -> str:
+    path = tmp_path / "pipeline.json"
+    path.write_text(json.dumps(data))
+    return str(path)
+
+
+def test_round_trip_preserves_steps(tmp_path):
+    steps = [
+        PipelineStep(Processor.GRAYSCALE),
+        PipelineStep(Processor.GAUSSIAN_BLUR, kernel_size=7, sigma=1.5),
+        PipelineStep(Processor.BINARY_THRESHOLD, threshold=200),
+    ]
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), steps)
+
+    assert load_pipeline(str(path)) == steps
+
+
+def test_round_trip_empty_pipeline(tmp_path):
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), [])
+
+    assert load_pipeline(str(path)) == []
+
+
+def test_saved_file_is_readable_json(tmp_path):
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), default_pipeline())
+
+    data = json.loads(path.read_text())
+    assert data["version"] == 1
+    assert data["steps"][0] == {"processor": "GRAYSCALE"}
+    assert data["steps"][1]["processor"] == "GAUSSIAN_BLUR"
+    assert data["steps"][1]["kernel_size"] == 5
+    assert data["steps"][1]["sigma"] == 0.0
+    assert data["steps"][2] == {"processor": "BINARY_THRESHOLD", "threshold": 127}
+
+
+def test_load_missing_file_raises():
+    with pytest.raises(PipelineFileError):
+        load_pipeline("this_file_does_not_exist.json")
+
+
+def test_load_invalid_json_raises(tmp_path):
+    path = tmp_path / "pipeline.json"
+    path.write_text("this is not json")
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(str(path))
+
+
+def test_load_unsupported_version_raises(tmp_path):
+    path = _write_json(tmp_path, {"version": 99, "steps": []})
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+def test_load_steps_not_a_list_raises(tmp_path):
+    path = _write_json(tmp_path, {"version": 1, "steps": {"processor": "GRAYSCALE"}})
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+def test_load_unknown_processor_raises(tmp_path):
+    path = _write_json(tmp_path, {"version": 1, "steps": [{"processor": "EDGE"}]})
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("kernel_size", [0, -1, 4, 5.5, "5"])
+def test_load_invalid_kernel_size_raises(tmp_path, kernel_size):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [
+                {"processor": "GAUSSIAN_BLUR", "kernel_size": kernel_size, "sigma": 0.0}
+            ],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+def test_load_negative_sigma_raises(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [
+                {"processor": "GAUSSIAN_BLUR", "kernel_size": 5, "sigma": -1.0}
+            ],
+        },
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+@pytest.mark.parametrize("threshold", [-1, 256, 1.5, "127"])
+def test_load_invalid_threshold_raises(tmp_path, threshold):
+    path = _write_json(
+        tmp_path,
+        {"version": 1, "steps": [{"processor": "BINARY_THRESHOLD", "threshold": threshold}]},
+    )
+
+    with pytest.raises(PipelineFileError):
+        load_pipeline(path)
+
+
+def test_load_uses_defaults_for_missing_parameters(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {
+            "version": 1,
+            "steps": [
+                {"processor": "GAUSSIAN_BLUR"},
+                {"processor": "BINARY_THRESHOLD"},
+            ],
+        },
+    )
+
+    loaded = load_pipeline(path)
+
+    assert loaded[0].kernel_size == 5
+    assert loaded[0].sigma == 0.0
+    assert loaded[1].threshold == 127
+
+
+def test_load_ignores_unknown_keys(tmp_path):
+    path = _write_json(
+        tmp_path,
+        {"version": 1, "steps": [{"processor": "GRAYSCALE", "extra": 123}]},
+    )
+
+    assert load_pipeline(path) == [PipelineStep(Processor.GRAYSCALE)]
+
+
+def test_save_to_invalid_path_raises(tmp_path):
+    with pytest.raises(PipelineFileError):
+        save_pipeline(str(tmp_path / "missing_dir" / "pipeline.json"), default_pipeline())
+
+
+def test_saved_pipeline_runs_the_same(tmp_path):
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    image[:, :4] = 220
+    steps = default_pipeline()
+    path = tmp_path / "pipeline.json"
+
+    save_pipeline(str(path), steps)
+    loaded = load_pipeline(str(path))
+
+    np.testing.assert_array_equal(
+        run_pipeline(image, loaded), run_pipeline(image, steps)
+    )
