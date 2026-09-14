@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M3 (configurable processor parameters) is complete. The next milestone is M4:
-editable pipeline.
+M4 (editable pipeline) is complete. The next milestone is M5: intermediate
+results and export.
 
 ## Guiding Principles
 
@@ -217,6 +217,25 @@ Possible parameters include:
 This is the first milestone where a small processor-step abstraction may be
 justified. It should represent only the concrete needs of the UI, such as
 processor type and parameters. It should not become a plugin architecture.
+
+**Implemented:**
+
+- A `PipelineStep` dataclass pairs a `Processor` enum with its parameters, and
+  `run_pipeline()` applies a list of steps in order.
+- The pipeline is a plain list that the user can edit.
+- The UI lists the steps and provides Add, Remove, Move Up, and Move Down
+  controls, plus a combo box to choose the processor.
+- Each step keeps its own parameters: kernel size and sigma for Gaussian blur,
+  and the threshold value for binary threshold. The editor shows only the
+  fields relevant to the selected step.
+- The available processors are grayscale, Gaussian blur, and binary threshold.
+- `Apply` reprocesses the loaded image with the current steps.
+- Focused tests cover step ordering, removing steps, per-step parameters, and
+  incompatible order.
+
+**Current status:** Complete.
+
+Intermediate results and exporting the final image remain for M5.
 
 ## M5: Intermediate Results and Export
 

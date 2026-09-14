@@ -7,7 +7,6 @@ from openvision_lab.image_ops import (
     binary_threshold,
     gaussian_blur,
     load_image,
-    run_pipeline,
     to_grayscale,
 )
 
@@ -117,26 +116,6 @@ def test_binary_threshold_rejects_color_input():
         binary_threshold(image)
 
 
-def test_run_pipeline_returns_binary_grayscale():
-    image = np.zeros((8, 8, 3), dtype=np.uint8)
-    image[:, :4] = 255
-
-    result = run_pipeline(image)
-
-    assert result.shape == (8, 8)
-    assert result.dtype == np.uint8
-    assert set(np.unique(result)).issubset({0, 255})
-
-
-def test_run_pipeline_matches_manual_composition():
-    image = np.zeros((8, 8, 3), dtype=np.uint8)
-    image[3, 3] = 255
-
-    expected = binary_threshold(gaussian_blur(to_grayscale(image)))
-
-    assert np.array_equal(run_pipeline(image), expected)
-
-
 def test_gaussian_blur_accepts_custom_kernel_size():
     image = np.zeros((7, 7), dtype=np.uint8)
     image[3, 3] = 255
@@ -176,18 +155,5 @@ def test_binary_threshold_rejects_out_of_range_threshold(threshold):
 
     with pytest.raises(ValueError):
         binary_threshold(image, threshold=threshold)
-
-
-def test_run_pipeline_uses_custom_parameters():
-    image = np.zeros((8, 8, 3), dtype=np.uint8)
-    image[3, 3] = 255
-
-    expected = binary_threshold(
-        gaussian_blur(to_grayscale(image), kernel_size=3), threshold=100
-    )
-
-    result = run_pipeline(image, kernel_size=3, threshold=100)
-
-    assert np.array_equal(result, expected)
 
 

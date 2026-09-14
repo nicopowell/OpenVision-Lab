@@ -2,11 +2,14 @@ import numpy as np
 from PySide6.QtCore import Qt
 from PySide6.QtGui import QAction
 from PySide6.QtWidgets import (
+    QComboBox,
+    QDoubleSpinBox,
     QFileDialog,
     QFormLayout,
     QGroupBox,
     QHBoxLayout,
     QLabel,
+    QListWidget,
     QMainWindow,
     QMessageBox,
     QPushButton,
@@ -15,7 +18,13 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from openvision_lab.image_ops import ImageLoadError, load_image, run_pipeline
+from openvision_lab.image_ops import ImageLoadError, load_image
+from openvision_lab.pipeline import (
+    PipelineStep,
+    Processor,
+    default_pipeline,
+    run_pipeline,
+)
 from openvision_lab.qt_image import array_to_qpixmap
 
 # Qt file dialog filter syntax: a description followed by space-separated glob
@@ -27,11 +36,19 @@ class MainWindow(QMainWindow):
     def __init__(self) -> None:
         super().__init__()
         self.setWindowTitle("OpenVision Lab")
-        self.resize(900, 600)
+        self.resize(1000, 600)
 
-        # The loaded source image is kept so the pipeline can be re-run with
-        # new parameters without reloading the file.
+        # The loaded source image is kept so the pipeline can be re-run without
+        # reloading the file.
         self.current_image: np.ndarray | None = None
+
+        # The pipeline is the application state the UI edits. It starts with
+        # the default steps but is a plain list that can be changed.
+        self.steps = default_pipeline()
+
+        # Guard set while the parameter widgets are being populated, so loading
+        # a step does not write its values back into the step.
+        self._loading_step = False
 
         # Keep the labels as attributes so open_image() and _process() can
         # replace their pixmaps later.
@@ -42,9 +59,9 @@ class MainWindow(QMainWindow):
         images_layout.addWidget(self._create_panel("Original", self.original_label))
         images_layout.addWidget(self._create_panel("Result", self.result_label))
 
-        central_layout = QVBoxLayout()
-        central_layout.addWidget(self._create_parameters_group())
-        central_layout.addLayout(images_layout)
+        central_layout = QHBoxLayout()
+        central_layout.addWidget(self._create_pipeline_group())
+        central_layout.addLayout(images_layout, stretch=1)
 
         # A QMainWindow shows one central widget, so the layout lives inside a
         # plain QWidget that is set as that central widget.
@@ -73,38 +90,178 @@ class MainWindow(QMainWindow):
         panel_layout.addWidget(label)
         return panel
 
-    def _create_parameters_group(self) -> QGroupBox:
+    def _create_pipeline_group(self) -> QGroupBox:
+        self.step_list = QListWidget()
+        self.step_list.currentRowChanged.connect(self._on_step_selected)
+
+        self.processor_combo = QComboBox()
+        for processor in Processor:
+            # Store the enum member as item data and show its display name.
+            self.processor_combo.addItem(processor.value, processor)
+
+        add_button = QPushButton("Add")
+        add_button.clicked.connect(self._add_step)
+
+        self.remove_button = QPushButton("Remove")
+        self.remove_button.clicked.connect(self._remove_step)
+
+        self.up_button = QPushButton("Move Up")
+        self.up_button.clicked.connect(lambda: self._move_step(-1))
+
+        self.down_button = QPushButton("Move Down")
+        self.down_button.clicked.connect(lambda: self._move_step(1))
+
+        buttons_layout = QHBoxLayout()
+        buttons_layout.addWidget(self.processor_combo)
+        buttons_layout.addWidget(add_button)
+        buttons_layout.addWidget(self.remove_button)
+        buttons_layout.addWidget(self.up_button)
+        buttons_layout.addWidget(self.down_button)
+
         # Only odd kernel sizes are valid for Gaussian blur, so the spin box
         # steps by 2. gaussian_blur() still validates the value defensively.
         self.kernel_spin = QSpinBox()
         self.kernel_spin.setRange(1, 31)
         self.kernel_spin.setSingleStep(2)
-        self.kernel_spin.setValue(5)
+        self.kernel_spin.valueChanged.connect(self._on_parameters_changed)
+
+        self.sigma_spin = QDoubleSpinBox()
+        self.sigma_spin.setRange(0.0, 10.0)
+        self.sigma_spin.setSingleStep(0.5)
+        self.sigma_spin.setDecimals(2)
+        self.sigma_spin.valueChanged.connect(self._on_parameters_changed)
 
         self.threshold_spin = QSpinBox()
         self.threshold_spin.setRange(0, 255)
-        self.threshold_spin.setValue(127)
+        self.threshold_spin.valueChanged.connect(self._on_parameters_changed)
+
+        self.parameters_form = QFormLayout()
+        self.parameters_form.addRow("Blur kernel size", self.kernel_spin)
+        self.parameters_form.addRow("Blur sigma", self.sigma_spin)
+        self.parameters_form.addRow("Threshold", self.threshold_spin)
 
         self.apply_button = QPushButton("Apply")
         self.apply_button.setEnabled(False)
         self.apply_button.clicked.connect(self._process)
 
-        form_layout = QFormLayout()
-        form_layout.addRow("Blur kernel size", self.kernel_spin)
-        form_layout.addRow("Threshold", self.threshold_spin)
-
-        group = QGroupBox("Parameters")
+        group = QGroupBox("Pipeline")
         group_layout = QVBoxLayout(group)
-        group_layout.addLayout(form_layout)
+        group_layout.addWidget(self.step_list)
+        group_layout.addLayout(buttons_layout)
+        group_layout.addLayout(self.parameters_form)
         group_layout.addWidget(self.apply_button)
+
+        self._rebuild_step_list(0)
         return group
+
+    def _describe_step(self, step: PipelineStep) -> str:
+        """Return the short text shown for a step in the list."""
+        if step.processor is Processor.GAUSSIAN_BLUR:
+            return f"{step.processor.value} (k={step.kernel_size}, sigma={step.sigma})"
+        if step.processor is Processor.BINARY_THRESHOLD:
+            return f"{step.processor.value} (t={step.threshold})"
+        return step.processor.value
+
+    def _selected_step(self) -> PipelineStep | None:
+        row = self.step_list.currentRow()
+        if 0 <= row < len(self.steps):
+            return self.steps[row]
+        return None
+
+    def _rebuild_step_list(self, select_row: int) -> None:
+        """Rebuild the list widget from ``self.steps`` and select a row."""
+        self.step_list.blockSignals(True)
+        self.step_list.clear()
+        for step in self.steps:
+            self.step_list.addItem(self._describe_step(step))
+        self.step_list.blockSignals(False)
+
+        if self.steps:
+            self.step_list.setCurrentRow(select_row)
+        else:
+            # No steps: clear the editor and refresh the buttons explicitly,
+            # because no selection change signal is emitted.
+            self._load_selected_step()
+            self._update_buttons()
+
+    def _on_step_selected(self, _row: int) -> None:
+        self._load_selected_step()
+        self._update_buttons()
+
+    def _update_buttons(self) -> None:
+        row = self.step_list.currentRow()
+        has_selection = 0 <= row < len(self.steps)
+        self.remove_button.setEnabled(has_selection)
+        self.up_button.setEnabled(has_selection and row > 0)
+        self.down_button.setEnabled(has_selection and row < len(self.steps) - 1)
+
+    def _load_selected_step(self) -> None:
+        """Show the selected step's parameters in the editor widgets."""
+        step = self._selected_step()
+        self._loading_step = True
+        try:
+            is_blur = step is not None and step.processor is Processor.GAUSSIAN_BLUR
+            is_threshold = (
+                step is not None and step.processor is Processor.BINARY_THRESHOLD
+            )
+            # Rows that do not apply to the selected processor are hidden.
+            self.parameters_form.setRowVisible(self.kernel_spin, is_blur)
+            self.parameters_form.setRowVisible(self.sigma_spin, is_blur)
+            self.parameters_form.setRowVisible(self.threshold_spin, is_threshold)
+
+            if step is None:
+                return
+            self.kernel_spin.setValue(step.kernel_size)
+            self.sigma_spin.setValue(step.sigma)
+            self.threshold_spin.setValue(step.threshold)
+        finally:
+            self._loading_step = False
+
+    def _on_parameters_changed(self, _value: float) -> None:
+        """Write edited parameters back into the selected step."""
+        if self._loading_step:
+            return
+        step = self._selected_step()
+        if step is None:
+            return
+        if step.processor is Processor.GAUSSIAN_BLUR:
+            step.kernel_size = self.kernel_spin.value()
+            step.sigma = self.sigma_spin.value()
+        elif step.processor is Processor.BINARY_THRESHOLD:
+            step.threshold = self.threshold_spin.value()
+
+        row = self.step_list.currentRow()
+        self.step_list.blockSignals(True)
+        self.step_list.item(row).setText(self._describe_step(step))
+        self.step_list.blockSignals(False)
+
+    def _add_step(self) -> None:
+        processor = self.processor_combo.currentData()
+        self.steps.append(PipelineStep(processor))
+        self._rebuild_step_list(len(self.steps) - 1)
+
+    def _remove_step(self) -> None:
+        row = self.step_list.currentRow()
+        if not 0 <= row < len(self.steps):
+            return
+        del self.steps[row]
+        self._rebuild_step_list(min(row, len(self.steps) - 1))
+
+    def _move_step(self, delta: int) -> None:
+        row = self.step_list.currentRow()
+        target = row + delta
+        if not (0 <= row < len(self.steps) and 0 <= target < len(self.steps)):
+            return
+        self.steps[row], self.steps[target] = self.steps[target], self.steps[row]
+        # Keep the moved step selected at its new position.
+        self._rebuild_step_list(target)
 
     def open_image(self) -> None:
         """Ask the user for an image file and update both panels.
 
         Does nothing when the dialog is cancelled. Load errors are shown in a
-        message box instead of being raised. The parameters are applied with
-        their current values.
+        message box instead of being raised. The pipeline is applied with its
+        current steps.
         """
         # getOpenFileName returns (path, selected_filter); the path is empty
         # when the user cancels.
@@ -122,15 +279,11 @@ class MainWindow(QMainWindow):
         self._process()
 
     def _process(self) -> None:
-        """Re-run the pipeline on the loaded image with the current parameters."""
+        """Run the pipeline on the loaded image with the current steps."""
         if self.current_image is None:
             return
         try:
-            result = run_pipeline(
-                self.current_image,
-                kernel_size=self.kernel_spin.value(),
-                threshold=self.threshold_spin.value(),
-            )
+            result = run_pipeline(self.current_image, self.steps)
         except ValueError as error:
             QMessageBox.warning(self, "Processing", str(error))
             return

@@ -8,16 +8,20 @@ The initial workflow is:
 2. Apply image-processing operations.
 3. Display the result.
 
-The application loads an image, runs a fixed pipeline (grayscale, Gaussian
-blur, binary threshold), and shows the original and processed images. The blur
-kernel size and threshold value can be adjusted.
+The application loads an image, applies an editable pipeline of image
+operations, and shows the original and processed images. Steps can be added,
+removed, and reordered, and each step keeps its own parameters. The available
+processors are grayscale, Gaussian blur, and binary threshold.
 
 ## Usage
 
 1. Start the application.
 2. Open `File > Open Image...` and choose a PNG, JPEG, BMP, or TIFF file.
 3. The original and processed images are shown side by side.
-4. Adjust `Blur kernel size` or `Threshold` and click `Apply` to reprocess.
+4. In the left panel, choose a processor and click `Add` to append a step.
+5. Select a step to edit its parameters, and use `Remove`, `Move Up`, or
+   `Move Down` to change the pipeline.
+6. Click `Apply` to reprocess with the current steps.
 
 ## Requirements
 

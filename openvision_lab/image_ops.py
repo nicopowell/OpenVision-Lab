@@ -135,30 +135,3 @@ def binary_threshold(image: np.ndarray, *, threshold: int = 127) -> np.ndarray:
     # cv2.threshold returns (retval, dst); only the thresholded image matters.
     _, result = cv2.threshold(image, threshold, 255, cv2.THRESH_BINARY)
     return result
-
-
-def run_pipeline(
-    image: np.ndarray, *, kernel_size: int = 5, sigma: float = 0.0, threshold: int = 127
-) -> np.ndarray:
-    """Run the fixed processing sequence on a color image.
-
-    The steps are applied in order: grayscale, Gaussian blur, and binary
-    threshold. Each step receives the output of the previous one.
-
-    Args:
-        image: BGR image of shape ``(height, width, 3)`` and dtype ``uint8``.
-        kernel_size: Gaussian blur kernel size, passed to :func:`gaussian_blur`.
-        sigma: Gaussian blur sigma, passed to :func:`gaussian_blur`.
-        threshold: Binary threshold value, passed to :func:`binary_threshold`.
-
-    Returns:
-        A binary ``uint8`` array of shape ``(height, width)``.
-
-    Raises:
-        ValueError: If a step receives an image that does not match its
-            precondition, or if a parameter is outside its valid range.
-    """
-    result = to_grayscale(image)
-    result = gaussian_blur(result, kernel_size=kernel_size, sigma=sigma)
-    result = binary_threshold(result, threshold=threshold)
-    return result
