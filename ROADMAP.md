@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M1 (loading an image and applying grayscale) is complete. The next milestone
-is M2: executing multiple processors in a fixed sequence.
+M2 (multiple processors in a fixed sequence) is complete. The next milestone
+is M3: configurable processor parameters.
 
 ## Guiding Principles
 
@@ -140,6 +140,18 @@ The initial processors may include:
 - How to represent a sequence temporarily.
 - Which processors accept color or grayscale input.
 - How incompatible operations are reported.
+
+**Implemented:**
+
+- A fixed pipeline: grayscale -> Gaussian blur -> binary threshold.
+- `PIPELINE`, a tuple of plain processing functions.
+- `run_pipeline()`, which applies the steps in order.
+- Fixed parameters for blur (`ksize=(5, 5)`, `sigma=0`) and threshold
+  (`thresh=127`, `maxval=255`, `THRESH_BINARY`).
+- The final result is displayed in the UI next to the original image.
+- Focused tests for blur, threshold, and the pipeline.
+
+**Current status:** Complete.
 
 Do not introduce plugins, registries, factories, or dynamic discovery.
 

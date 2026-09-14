@@ -2,7 +2,14 @@ import cv2
 import numpy as np
 import pytest
 
-from openvision_lab.image_ops import ImageLoadError, load_image, to_grayscale
+from openvision_lab.image_ops import (
+    ImageLoadError,
+    binary_threshold,
+    gaussian_blur,
+    load_image,
+    run_pipeline,
+    to_grayscale,
+)
 
 
 def test_load_image_returns_bgr_array(tmp_path):
@@ -58,3 +65,74 @@ def test_to_grayscale_rejects_grayscale_input():
 
     with pytest.raises(ValueError):
         to_grayscale(image)
+
+
+def test_gaussian_blur_preserves_shape_and_dtype():
+    image = np.zeros((5, 7), dtype=np.uint8)
+    image[2, 3] = 255
+
+    blurred = gaussian_blur(image)
+
+    assert blurred.shape == (5, 7)
+    assert blurred.dtype == np.uint8
+
+
+def test_gaussian_blur_keeps_constant_image():
+    image = np.full((6, 6), 100, dtype=np.uint8)
+
+    blurred = gaussian_blur(image)
+
+    assert np.all(blurred == 100)
+
+
+def test_gaussian_blur_rejects_color_input():
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        gaussian_blur(image)
+
+
+def test_binary_threshold_outputs_only_black_and_white():
+    image = np.array([[0, 60, 200, 255]], dtype=np.uint8)
+
+    result = binary_threshold(image)
+
+    assert result.shape == (1, 4)
+    assert result.dtype == np.uint8
+    assert set(np.unique(result)).issubset({0, 255})
+
+
+def test_binary_threshold_applies_threshold_127():
+    image = np.array([[0, 127, 128, 255]], dtype=np.uint8)
+
+    result = binary_threshold(image)
+
+    assert result.tolist() == [[0, 0, 255, 255]]
+
+
+def test_binary_threshold_rejects_color_input():
+    image = np.zeros((4, 4, 3), dtype=np.uint8)
+
+    with pytest.raises(ValueError):
+        binary_threshold(image)
+
+
+def test_run_pipeline_returns_binary_grayscale():
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    image[:, :4] = 255
+
+    result = run_pipeline(image)
+
+    assert result.shape == (8, 8)
+    assert result.dtype == np.uint8
+    assert set(np.unique(result)).issubset({0, 255})
+
+
+def test_run_pipeline_matches_manual_composition():
+    image = np.zeros((8, 8, 3), dtype=np.uint8)
+    image[3, 3] = 255
+
+    expected = binary_threshold(gaussian_blur(to_grayscale(image)))
+
+    assert np.array_equal(run_pipeline(image), expected)
+

@@ -11,7 +11,7 @@ from PySide6.QtWidgets import (
     QWidget,
 )
 
-from openvision_lab.image_ops import ImageLoadError, load_image, to_grayscale
+from openvision_lab.image_ops import ImageLoadError, load_image, run_pipeline
 from openvision_lab.qt_image import array_to_qpixmap
 
 # Qt file dialog filter syntax: a description followed by space-separated glob
@@ -28,11 +28,11 @@ class MainWindow(QMainWindow):
         # Keep the labels as attributes so open_image() can replace their
         # pixmaps later, when the user picks a file.
         self.original_label = self._create_image_label()
-        self.grayscale_label = self._create_image_label()
+        self.result_label = self._create_image_label()
 
         layout = QHBoxLayout()
         layout.addWidget(self._create_panel("Original", self.original_label))
-        layout.addWidget(self._create_panel("Grayscale", self.grayscale_label))
+        layout.addWidget(self._create_panel("Result", self.result_label))
 
         # A QMainWindow shows one central widget, so the layout lives inside a
         # plain QWidget that is set as that central widget.
@@ -64,7 +64,7 @@ class MainWindow(QMainWindow):
     def open_image(self) -> None:
         """Ask the user for an image file and update both panels.
 
-        Does nothing when the dialog is cancelled. Load and conversion errors
+        Does nothing when the dialog is cancelled. Load and processing errors
         are shown in a message box instead of being raised.
         """
         # getOpenFileName returns (path, selected_filter); the path is empty
@@ -74,9 +74,9 @@ class MainWindow(QMainWindow):
             return
         try:
             image = load_image(path)
-            grayscale = to_grayscale(image)
+            result = run_pipeline(image)
         except (ImageLoadError, ValueError) as error:
             QMessageBox.warning(self, "Open Image", str(error))
             return
         self.original_label.setPixmap(array_to_qpixmap(image))
-        self.grayscale_label.setPixmap(array_to_qpixmap(grayscale))
+        self.result_label.setPixmap(array_to_qpixmap(result))
