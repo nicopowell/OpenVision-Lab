@@ -12,8 +12,7 @@ Computer Vision. The initial workflow is:
 The initial product is intentionally small: load one image, convert it to
 grayscale, and display both the original and processed images.
 
-The current project state is documented in `ROADMAP.md`. The project is
-currently at milestone M0.1: preparing the Python development environment.
+The current project state and milestone are documented in `ROADMAP.md`.
 
 ## Stack
 

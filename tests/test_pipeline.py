@@ -11,28 +11,16 @@ from openvision_lab.pipeline import (
 )
 
 
-def _sample_image() -> np.ndarray:
-    image = np.zeros((8, 8, 3), dtype=np.uint8)
-    image[3, 3] = 255
-    return image
+def test_empty_pipeline_returns_image_unchanged(bgr_image):
+    np.testing.assert_array_equal(run_pipeline(bgr_image, []), bgr_image)
 
 
-def test_empty_pipeline_returns_image_unchanged():
-    image = _sample_image()
-
-    result = run_pipeline(image, [])
-
-    assert np.array_equal(result, image)
-
-
-def test_run_pipeline_matches_manual_composition():
-    image = _sample_image()
-
+def test_run_pipeline_matches_manual_composition(bgr_image):
     expected = binary_threshold(
-        gaussian_blur(to_grayscale(image), kernel_size=5), threshold=127
+        gaussian_blur(to_grayscale(bgr_image), kernel_size=5), threshold=127
     )
 
-    assert np.array_equal(run_pipeline(image, default_pipeline()), expected)
+    np.testing.assert_array_equal(run_pipeline(bgr_image, default_pipeline()), expected)
 
 
 def test_step_order_changes_result():
@@ -56,16 +44,15 @@ def test_step_order_changes_result():
     )
 
 
-def test_removing_a_step_matches_composition_without_it():
-    image = _sample_image()
+def test_removing_a_step_matches_composition_without_it(bgr_image):
     steps = [
         PipelineStep(Processor.GRAYSCALE),
         PipelineStep(Processor.BINARY_THRESHOLD, threshold=100),
     ]
 
-    expected = binary_threshold(to_grayscale(image), threshold=100)
+    expected = binary_threshold(to_grayscale(bgr_image), threshold=100)
 
-    assert np.array_equal(run_pipeline(image, steps), expected)
+    np.testing.assert_array_equal(run_pipeline(bgr_image, steps), expected)
 
 
 def test_step_uses_its_own_parameters():
@@ -86,15 +73,14 @@ def test_step_uses_its_own_parameters():
     )
 
 
-def test_incompatible_order_raises_value_error():
-    image = _sample_image()
+def test_incompatible_order_raises_value_error(bgr_image):
     steps = [
         PipelineStep(Processor.BINARY_THRESHOLD, threshold=127),
         PipelineStep(Processor.GRAYSCALE),
     ]
 
     with pytest.raises(ValueError):
-        run_pipeline(image, steps)
+        run_pipeline(bgr_image, steps)
 
 
 def test_default_pipeline_returns_independent_lists():
@@ -107,44 +93,39 @@ def test_default_pipeline_returns_independent_lists():
     assert second[1].kernel_size == 5
 
 
-def test_intermediates_include_input_and_final_result():
-    image = _sample_image()
+def test_intermediates_include_input_and_final_result(bgr_image):
     steps = default_pipeline()
 
-    results = run_pipeline_with_intermediates(image, steps)
+    results = run_pipeline_with_intermediates(bgr_image, steps)
 
     assert len(results) == len(steps) + 1
-    assert results[0] is image
-    assert np.array_equal(results[-1], run_pipeline(image, steps))
+    assert results[0] is bgr_image
+    np.testing.assert_array_equal(results[-1], run_pipeline(bgr_image, steps))
 
 
-def test_intermediates_match_prefix_composition():
-    image = _sample_image()
+def test_intermediates_match_prefix_composition(bgr_image):
     steps = default_pipeline()
 
-    results = run_pipeline_with_intermediates(image, steps)
+    results = run_pipeline_with_intermediates(bgr_image, steps)
 
-    gray = to_grayscale(image)
+    gray = to_grayscale(bgr_image)
     blurred = gaussian_blur(gray, kernel_size=5, sigma=0.0)
     expected = binary_threshold(blurred, threshold=127)
-    assert np.array_equal(results[1], gray)
-    assert np.array_equal(results[2], blurred)
-    assert np.array_equal(results[3], expected)
+    np.testing.assert_array_equal(results[1], gray)
+    np.testing.assert_array_equal(results[2], blurred)
+    np.testing.assert_array_equal(results[3], expected)
 
 
-def test_intermediates_empty_pipeline_returns_only_input():
-    image = _sample_image()
-
-    results = run_pipeline_with_intermediates(image, [])
+def test_intermediates_empty_pipeline_returns_only_input(bgr_image):
+    results = run_pipeline_with_intermediates(bgr_image, [])
 
     assert len(results) == 1
-    assert results[0] is image
+    assert results[0] is bgr_image
 
 
-def test_intermediates_do_not_modify_original():
-    image = _sample_image()
-    original_copy = image.copy()
+def test_intermediates_do_not_modify_original(bgr_image):
+    original_copy = bgr_image.copy()
 
-    run_pipeline_with_intermediates(image, default_pipeline())
+    run_pipeline_with_intermediates(bgr_image, default_pipeline())
 
-    assert np.array_equal(image, original_copy)
+    np.testing.assert_array_equal(bgr_image, original_copy)

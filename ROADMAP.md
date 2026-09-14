@@ -16,8 +16,8 @@ and understandable application.
 
 ## Current Status
 
-M5 (intermediate results and export) is complete. The next milestone is M6:
-testing, quality, and refactoring.
+M6 (testing, quality, and refactoring) is complete. The next milestone is M7:
+undo and redo, which is conditional.
 
 ## Guiding Principles
 
@@ -302,6 +302,19 @@ not the first testing milestone.
 
 Refactor only problems demonstrated by the existing implementation. Avoid a
 large rewrite for architectural purity.
+
+**Implemented:**
+
+- Tests are organized by concern: `test_io.py` (load/save), `test_processors.py`
+  (grayscale, blur, threshold), `test_pipeline.py`, and `test_integration.py`
+  (file-to-file flows), with shared fixtures in `conftest.py`.
+- Array comparisons use `np.testing.assert_array_equal` for detailed failures.
+- Integration tests cover loading, running the pipeline, and saving end to end,
+  and verify that the original image is never modified.
+- No production refactor was needed: the existing structure was found
+  understandable and maintainable, so no changes were made to `openvision_lab/`.
+
+**Current status:** Complete.
 
 ## M7: Undo and Redo
 
